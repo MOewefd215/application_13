@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "253788510464",
+    "project_id": "my-pewar-project",
+    "storage_bucket": "my-pewar-project.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:253788510464:android:a2c93a55c8df52d47ebbe5",
+        "android_client_info": {
+          "package_name": "com.example.application_13"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBG_MuN3Z8X9zPWnkzgQO4t7dzebz5hWts"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
