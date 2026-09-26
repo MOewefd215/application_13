@@ -60,12 +60,14 @@ class NotificationService {
     if (unreadOnly == true) {
       query = query.where('read', isEqualTo: false);
     }
-    return query
-        .orderBy('created_at', descending: true)
-        .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => NotificationModel.fromMap(d.id, d.data()))
-            .toList());
+    return query.snapshots().map((snap) {
+      final items = snap.docs
+          .map((d) => NotificationModel.fromMap(d.id, d.data()))
+          .toList();
+      items.sort((a, b) => (b.createdAt ?? DateTime(0))
+          .compareTo(a.createdAt ?? DateTime(0)));
+      return items;
+    });
   }
 
   Future<void> markAsRead(String notificationId) {

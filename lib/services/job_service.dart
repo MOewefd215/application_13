@@ -84,35 +84,42 @@ class JobService {
   }
 
   /// Open jobs for the Home feed — "งานแนะนำสำหรับคุณ".
+  /// Sorted client-side (not `.orderBy()` in Firestore) so this never
+  /// needs a composite index to be created manually in the console.
   Stream<List<JobModel>> streamOpenJobs({int limit = 30}) {
     return _jobs
         .where('job_status', isEqualTo: JobStatus.open)
-        .orderBy('created_at', descending: true)
-        .limit(limit)
         .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList());
+        .map((snap) {
+      final jobs =
+          snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList();
+      jobs.sort((a, b) => (b.createdAt ?? DateTime(0))
+          .compareTo(a.createdAt ?? DateTime(0)));
+      return jobs.take(limit).toList();
+    });
   }
 
   /// A single employer's posted jobs — for "งานที่โพสต์" tab in
   /// Job History.
   Stream<List<JobModel>> streamJobsByEmployer(String empId) {
-    return _jobs
-        .where('emp_id', isEqualTo: empId)
-        .orderBy('created_at', descending: true)
-        .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList());
+    return _jobs.where('emp_id', isEqualTo: empId).snapshots().map((snap) {
+      final jobs =
+          snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList();
+      jobs.sort((a, b) => (b.createdAt ?? DateTime(0))
+          .compareTo(a.createdAt ?? DateTime(0)));
+      return jobs;
+    });
   }
 
   /// A single student's accepted jobs — for "งานที่รับ" tab.
   Stream<List<JobModel>> streamJobsByStudent(String stdId) {
-    return _jobs
-        .where('std_id', isEqualTo: stdId)
-        .orderBy('created_at', descending: true)
-        .snapshots()
-        .map((snap) =>
-            snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList());
+    return _jobs.where('std_id', isEqualTo: stdId).snapshots().map((snap) {
+      final jobs =
+          snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList();
+      jobs.sort((a, b) => (b.createdAt ?? DateTime(0))
+          .compareTo(a.createdAt ?? DateTime(0)));
+      return jobs;
+    });
   }
 
   CollectionReference<Map<String, dynamic>> get _applications =>
@@ -158,11 +165,32 @@ class JobService {
   Stream<List<JobApplicationModel>> streamApplicants(String jobId) {
     return _applications
         .where('job_id', isEqualTo: jobId)
-        .orderBy('applied_at', descending: false)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => JobApplicationModel.fromMap(d.id, d.data()))
-            .toList());
+        .map((snap) {
+      final apps = snap.docs
+          .map((d) => JobApplicationModel.fromMap(d.id, d.data()))
+          .toList();
+      apps.sort((a, b) => (a.appliedAt ?? DateTime(0))
+          .compareTo(b.appliedAt ?? DateTime(0)));
+      return apps;
+    });
+  }
+
+  /// All applications a student has sent, across every job — for
+  /// "คำขอที่ส่งไป" so students can track pending/accepted/rejected
+  /// status without digging through Home.
+  Stream<List<JobApplicationModel>> streamMyApplications(String stdId) {
+    return _applications
+        .where('student_id', isEqualTo: stdId)
+        .snapshots()
+        .map((snap) {
+      final apps = snap.docs
+          .map((d) => JobApplicationModel.fromMap(d.id, d.data()))
+          .toList();
+      apps.sort((a, b) => (b.appliedAt ?? DateTime(0))
+          .compareTo(a.appliedAt ?? DateTime(0)));
+      return apps;
+    });
   }
 
   /// Best-effort applicant display name — reads `students/{uid}`.

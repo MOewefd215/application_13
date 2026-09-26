@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 /// Mirrors the `JOBS` table from the ER diagram (รูปที่ 3.2.4) in the thesis:
 /// job_id, job_title, job_desc, job_budget, job_lat, job_lng,
 /// job_status, emp_id, std_id.
@@ -28,6 +30,7 @@ class JobModel {
   final String? jobDate; // เก็บเป็น "yyyy-MM-dd" — แสดงในหน้ารายละเอียดงาน
   final String? jobTime; // เก็บเป็น "HH:mm - HH:mm"
   final String? jobCategory;
+  final DateTime? createdAt;
 
   const JobModel({
     required this.jobId,
@@ -43,6 +46,7 @@ class JobModel {
     this.jobDate,
     this.jobTime,
     this.jobCategory,
+    this.createdAt,
   });
 
   factory JobModel.fromMap(String id, Map<String, dynamic> map) {
@@ -60,6 +64,7 @@ class JobModel {
       jobDate: map['job_date'],
       jobTime: map['job_time'],
       jobCategory: map['job_category'],
+      createdAt: (map['created_at'] as Timestamp?)?.toDate(),
     );
   }
 

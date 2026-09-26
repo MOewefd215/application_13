@@ -34,8 +34,17 @@ class ReportService {
     return _db
         .collection('reports')
         .where('reporter_id', isEqualTo: reporterId)
-        .orderBy('created_at', descending: true)
         .snapshots()
-        .map((snap) => snap.docs.map((d) => {'id': d.id, ...d.data()}).toList());
+        .map((snap) {
+      final reports =
+          snap.docs.map((d) => {'id': d.id, ...d.data()}).toList();
+      reports.sort((a, b) {
+        final ta = a['created_at'] as Timestamp?;
+        final tb = b['created_at'] as Timestamp?;
+        return (tb?.toDate() ?? DateTime(0))
+            .compareTo(ta?.toDate() ?? DateTime(0));
+      });
+      return reports;
+    });
   }
 }

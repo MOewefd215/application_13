@@ -65,7 +65,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       if (mounted) {
         setState(() {}); // รีเฟรช FutureBuilder ของ hasApplied
         ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('สมัครรับงานสำเร็จ')));
+            .showSnackBar(const SnackBar(
+                content: Text(
+                    'สมัครรับงานสำเร็จ เช็คสถานะได้ที่ "งานของฉัน" → "คำขอที่ส่งไป"')));
       }
     } catch (e) {
       if (mounted) {
@@ -190,6 +192,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       Row(
                         children: [
                           if (isEmployer &&
+                              job != null &&
                               job.jobStatus == JobStatus.open)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
@@ -322,6 +325,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               const TextStyle(color: AppColors.textSecondary),
                         ),
                         if (isEmployer &&
+                            job != null &&
                             job.jobStatus == JobStatus.open) ...[
                           const SizedBox(height: 20),
                           const Text('ผู้สมัครรับงาน',
@@ -522,7 +526,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Widget _circleIcon(IconData icon, VoidCallback onTap) => GestureDetector(
         onTap: onTap,
         child: CircleAvatar(
-          backgroundColor: Colors.white.withValues(alpha: 0.9),
+          backgroundColor: Colors.white.withOpacity(0.9),
           child: Icon(icon, color: AppColors.textPrimary, size: 20),
         ),
       );

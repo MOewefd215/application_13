@@ -19,10 +19,10 @@ class UploadService {
   final String cloudName;
   final String uploadPreset;
 
- UploadService({
-  this.cloudName = 'c65atebl',
-  this.uploadPreset = 'studentpro_unsigned',
-});
+  UploadService({
+    this.cloudName = 'c65atebl',
+    this.uploadPreset = 'studentpro_unsigned',
+  });
 
   Uri get _uploadUrl =>
       Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
@@ -46,7 +46,8 @@ class UploadService {
   /// Throws [StateError] with a Thai message on failure so the UI
   /// can show it directly in a SnackBar.
   Future<String> uploadFile(File file) async {
-    if (cloudName == 'YOUR_CLOUD_NAME' || uploadPreset == 'YOUR_UPLOAD_PRESET') {
+    if (cloudName == 'YOUR_CLOUD_NAME' ||
+        uploadPreset == 'YOUR_UPLOAD_PRESET') {
       throw StateError(
           'ยังไม่ได้ตั้งค่า Cloudinary — ใส่ cloudName/uploadPreset ใน UploadService ก่อน');
     }
@@ -66,6 +67,32 @@ class UploadService {
     final url = data['secure_url'] as String?;
     if (url == null) {
       throw StateError('อัปโหลดสำเร็จแต่ไม่ได้รับลิงก์รูปกลับมา');
+    }
+    return url;
+  }
+
+  /// Uploads an audio recording to Cloudinary and returns its public URL.
+  Future<String> uploadAudioFile(File file) async {
+    final audioUrl = Uri.parse(
+      'https://api.cloudinary.com/v1_1/$cloudName/video/upload',
+    );
+    final request = http.MultipartRequest('POST', audioUrl)
+      ..fields['upload_preset'] = uploadPreset
+      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Audio upload failed (' +
+            response.statusCode.toString() +
+            '): ' +
+            response.body,
+      );
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final url = data['secure_url'] as String?;
+    if (url == null) {
+      throw StateError('Audio upload completed but no URL was returned.');
     }
     return url;
   }

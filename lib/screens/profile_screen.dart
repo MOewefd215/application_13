@@ -31,7 +31,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _loadUser() {
-    setState(() => _userFuture = _authService.getCurrentAppUser());
+    setState(() {
+      _userFuture = _authService.getCurrentAppUser();
+    });
   }
 
   Future<void> _confirmLogout(BuildContext context) async {

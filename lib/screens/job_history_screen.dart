@@ -4,8 +4,11 @@ import '../widgets/bottom_nav.dart';
 import '../services/auth_service.dart';
 import '../services/job_service.dart';
 import '../models/job_model.dart';
+import '../models/job_application_model.dart';
 import '../models/user_role.dart';
 import 'job_detail_screen.dart';
+
+enum _StudentTab { received, applications }
 
 class JobHistoryScreen extends StatefulWidget {
   const JobHistoryScreen({super.key});
@@ -17,7 +20,7 @@ class JobHistoryScreen extends StatefulWidget {
 class _JobHistoryScreenState extends State<JobHistoryScreen> {
   final _jobService = JobService();
   final _authService = AuthService();
-  bool showReceived = true; // นักศึกษา: งานที่รับ / ผู้จ้างงาน: งานที่โพสต์
+  _StudentTab _studentTab = _StudentTab.received;
 
   @override
   Widget build(BuildContext context) {
@@ -34,56 +37,178 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
           }
           final isEmployer = roleSnap.data == UserRole.employer;
 
+          if (isEmployer) {
+            return Column(
+              children: [
+                Expanded(child: _postedJobsList(uid)),
+                _earningsSummary(uid, isEmployer: true),
+              ],
+            );
+          }
+
           return Column(
             children: [
-              if (!isEmployer)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: _tabButton('งานที่รับ', showReceived,
-                            () => setState(() => showReceived = true)),
-                      ),
-                      Expanded(
-                        child: _tabButton('งานที่โพสต์', !showReceived,
-                            () => setState(() => showReceived = false)),
-                      ),
-                    ],
-                  ),
-                ),
-              Expanded(
-                child: StreamBuilder<List<JobModel>>(
-                  stream: isEmployer
-                      ? _jobService.streamJobsByEmployer(uid)
-                      : (showReceived
-                          ? _jobService.streamJobsByStudent(uid)
-                          : _jobService.streamJobsByEmployer(uid)),
-                  builder: (context, snapshot) {
-                    final jobs = snapshot.data ?? const [];
-                    if (snapshot.connectionState == ConnectionState.waiting) {
-                      return const Center(child: CircularProgressIndicator());
-                    }
-                    if (jobs.isEmpty) {
-                      return const EmptyState(
-                        icon: Icons.history,
-                        message: 'ยังไม่มีประวัติการทำงาน',
-                      );
-                    }
-                    return ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: jobs.length,
-                      itemBuilder: (context, index) =>
-                          _jobTile(context, jobs[index]),
-                    );
-                  },
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _tabButton(
+                          'งานที่รับ',
+                          _studentTab == _StudentTab.received,
+                          () => setState(
+                              () => _studentTab = _StudentTab.received)),
+                    ),
+                    Expanded(
+                      child: _tabButton(
+                          'คำขอที่ส่งไป',
+                          _studentTab == _StudentTab.applications,
+                          () => setState(
+                              () => _studentTab = _StudentTab.applications)),
+                    ),
+                  ],
                 ),
               ),
-              _earningsSummary(uid, isEmployer),
+              Expanded(
+                child: _studentTab == _StudentTab.received
+                    ? _receivedJobsList(uid)
+                    : _myApplicationsList(uid),
+              ),
+              if (_studentTab == _StudentTab.received)
+                _earningsSummary(uid, isEmployer: false),
             ],
           );
         },
       ),
+    );
+  }
+
+  Widget _postedJobsList(String uid) {
+    return StreamBuilder<List<JobModel>>(
+      stream: _jobService.streamJobsByEmployer(uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final jobs = snapshot.data ?? const [];
+        if (jobs.isEmpty) {
+          return const EmptyState(
+              icon: Icons.history, message: 'ยังไม่มีประวัติการทำงาน');
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: jobs.length,
+          itemBuilder: (context, index) => _jobTile(context, jobs[index]),
+        );
+      },
+    );
+  }
+
+  Widget _receivedJobsList(String uid) {
+    return StreamBuilder<List<JobModel>>(
+      stream: _jobService.streamJobsByStudent(uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final jobs = snapshot.data ?? const [];
+        if (jobs.isEmpty) {
+          return const EmptyState(
+            icon: Icons.history,
+            message: 'ยังไม่มีงานที่ได้รับเลือก',
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: jobs.length,
+          itemBuilder: (context, index) => _jobTile(context, jobs[index]),
+        );
+      },
+    );
+  }
+
+  /// แท็บ "คำขอที่ส่งไป" — แก้ปัญหา "กดสมัครแล้วงานหายไปไหน" ให้
+  /// นักศึกษาเห็นสถานะคำขอทุกใบของตัวเองที่นี่.
+  Widget _myApplicationsList(String uid) {
+    return StreamBuilder<List<JobApplicationModel>>(
+      stream: _jobService.streamMyApplications(uid),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final applications = snapshot.data ?? const [];
+        if (applications.isEmpty) {
+          return const EmptyState(
+            icon: Icons.send_outlined,
+            message: 'ยังไม่เคยสมัครงานใด ๆ',
+          );
+        }
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: applications.length,
+          itemBuilder: (context, index) =>
+              _applicationTile(context, applications[index]),
+        );
+      },
+    );
+  }
+
+  Widget _applicationTile(BuildContext context, JobApplicationModel app) {
+    final statusInfo = {
+          ApplicationStatus.pending: (
+            'รอผู้จ้างงานพิจารณา',
+            AppColors.textSecondary
+          ),
+          ApplicationStatus.accepted: ('ได้รับเลือกแล้ว', AppColors.success),
+          ApplicationStatus.rejected: ('ไม่ได้รับเลือก', AppColors.danger),
+        }[app.status] ??
+        (app.status, AppColors.textSecondary);
+
+    return FutureBuilder<JobModel?>(
+      future: _jobService.getJob(app.jobId),
+      builder: (context, jobSnap) {
+        final job = jobSnap.data;
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.card,
+            borderRadius: BorderRadius.circular(AppRadius.card),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: InkWell(
+            onTap: job == null
+                ? null
+                : () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => JobDetailScreen(
+                            jobId: job.jobId, jobTitle: job.jobTitle))),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(job?.jobTitle ?? 'กำลังโหลด...',
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w600)),
+                      const SizedBox(height: 4),
+                      Text(statusInfo.$1,
+                          style:
+                              TextStyle(fontSize: 12, color: statusInfo.$2)),
+                    ],
+                  ),
+                ),
+                if (job != null)
+                  Text('${job.jobBudget.toStringAsFixed(0)} บาท',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -136,7 +261,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
     );
   }
 
-  Widget _earningsSummary(String uid, bool isEmployer) {
+  Widget _earningsSummary(String uid, {required bool isEmployer}) {
     return StreamBuilder<List<JobModel>>(
       stream: isEmployer
           ? _jobService.streamJobsByEmployer(uid)
@@ -144,10 +269,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
       builder: (context, snapshot) {
         final jobs = (snapshot.data ?? const [])
             .where((j) => j.jobStatus == JobStatus.done);
-        final total = jobs.fold<double>(
-            0,
-            (sum, j) =>
-                sum + j.jobBudget);
+        final total = jobs.fold<double>(0, (sum, j) => sum + j.jobBudget);
 
         return Container(
           width: double.infinity,

@@ -60,11 +60,14 @@ class ReviewService {
     return _db
         .collection('reviews')
         .where('reviewee_id', isEqualTo: revieweeId)
-        .orderBy('created_at', descending: true)
-        .limit(limit)
         .snapshots()
-        .map((snap) => snap.docs
-            .map((d) => ReviewModel.fromMap(d.id, d.data()))
-            .toList());
+        .map((snap) {
+      final reviews = snap.docs
+          .map((d) => ReviewModel.fromMap(d.id, d.data()))
+          .toList();
+      reviews.sort((a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
+      return reviews.take(limit).toList();
+    });
   }
 }

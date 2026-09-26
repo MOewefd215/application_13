@@ -4,12 +4,18 @@ class ChatMessageModel {
   final String id;
   final String senderId;
   final String text;
+  final String? imageUrl;
+  final String? audioUrl;
+  final int? audioDurationMs;
   final DateTime? createdAt;
 
   const ChatMessageModel({
     required this.id,
     required this.senderId,
     required this.text,
+    this.imageUrl,
+    this.audioUrl,
+    this.audioDurationMs,
     this.createdAt,
   });
 
@@ -18,6 +24,9 @@ class ChatMessageModel {
       id: id,
       senderId: map['sender_id'] ?? '',
       text: map['text'] ?? '',
+      imageUrl: map['image_url'] as String?,
+      audioUrl: map['audio_url'] as String?,
+      audioDurationMs: (map['audio_duration_ms'] as num?)?.toInt(),
       createdAt: (map['created_at'] as Timestamp?)?.toDate(),
     );
   }
