@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
 import '../services/auth_service.dart';
+import '../widgets/bottom_nav.dart';
+import '../navigation/app_tab_navigation.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -15,10 +17,31 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool showUnreadOnly = false;
 
   @override
+  void initState() {
+    super.initState();
+    _markNotificationsAsRead();
+  }
+
+  Future<void> _markNotificationsAsRead() async {
+    final uid = AuthService().currentUser?.uid;
+    if (uid != null) {
+      await _notificationService.markAllAsReadForUser(uid);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final uid = AuthService().currentUser?.uid;
 
     return Scaffold(
+      bottomNavigationBar: StudentProBottomNav(
+        currentIndex: 3,
+        onTap: (index) => navigateToAppTab(
+          context,
+          destinationIndex: index,
+          currentIndex: 3,
+        ),
+      ),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.close),

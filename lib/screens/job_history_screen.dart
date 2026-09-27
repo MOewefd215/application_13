@@ -7,6 +7,7 @@ import '../models/job_model.dart';
 import '../models/job_application_model.dart';
 import '../models/user_role.dart';
 import 'job_detail_screen.dart';
+import '../navigation/app_tab_navigation.dart';
 
 enum _StudentTab { received, applications }
 
@@ -27,7 +28,14 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
     final uid = _authService.currentUser?.uid;
 
     return Scaffold(
-      bottomNavigationBar: StudentProBottomNav(currentIndex: 1, onTap: (_) {}),
+      bottomNavigationBar: StudentProBottomNav(
+        currentIndex: 1,
+        onTap: (index) => navigateToAppTab(
+          context,
+          destinationIndex: index,
+          currentIndex: 1,
+        ),
+      ),
       appBar: AppBar(title: const Text('ประวัติการทำงาน')),
       body: FutureBuilder<String?>(
         future: _authService.getUserRole(),

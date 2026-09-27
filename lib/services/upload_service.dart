@@ -83,10 +83,7 @@ class UploadService {
     final response = await http.Response.fromStream(streamedResponse);
     if (response.statusCode != 200) {
       throw StateError(
-        'Audio upload failed (' +
-            response.statusCode.toString() +
-            '): ' +
-            response.body,
+        'Audio upload failed (${response.statusCode}): ${response.body}',
       );
     }
     final data = jsonDecode(response.body) as Map<String, dynamic>;

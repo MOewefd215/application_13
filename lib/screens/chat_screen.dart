@@ -8,6 +8,8 @@ import '../services/chat_service.dart';
 import '../services/auth_service.dart';
 import '../models/chat_models.dart';
 import '../services/upload_service.dart';
+import '../widgets/bottom_nav.dart';
+import '../navigation/app_tab_navigation.dart';
 
 /// Chat list screen — real conversations from Firestore.
 class ChatScreen extends StatelessWidget {
@@ -18,6 +20,14 @@ class ChatScreen extends StatelessWidget {
     final uid = AuthService().currentUser?.uid;
     return Scaffold(
       appBar: AppBar(title: const Text('แชท')),
+      bottomNavigationBar: StudentProBottomNav(
+        currentIndex: 2,
+        onTap: (index) => navigateToAppTab(
+          context,
+          destinationIndex: index,
+          currentIndex: 2,
+        ),
+      ),
       body: uid == null
           ? const EmptyState(
               icon: Icons.lock_outline, message: 'กรุณาเข้าสู่ระบบก่อน')
@@ -174,11 +184,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       if (!await _audioRecorder.hasPermission()) {
         throw StateError('Microphone permission was denied.');
       }
-      final path = Directory.systemTemp.path +
-          Platform.pathSeparator +
-          'chat_voice_' +
-          DateTime.now().microsecondsSinceEpoch.toString() +
-          '.m4a';
+      final path = '${Directory.systemTemp.path}${Platform.pathSeparator}chat_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
       await _audioRecorder.start(
         const RecordConfig(encoder: AudioEncoder.aacLc),
         path: path,
@@ -199,7 +205,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text('Could not start recording: ' + error.toString())),
+              content: Text('Could not start recording: $error')),
         );
       }
     }
@@ -234,7 +240,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content:
-                  Text('Could not send voice message: ' + error.toString())),
+                  Text('Could not send voice message: $error')),
         );
       }
     } finally {
@@ -344,8 +350,9 @@ class _ConversationScreenState extends State<ConversationScreen> {
                                             fit: BoxFit.cover,
                                             loadingBuilder:
                                                 (context, child, progress) {
-                                              if (progress == null)
+                                              if (progress == null) {
                                                 return child;
+                                              }
                                               return const SizedBox(
                                                 width: 220,
                                                 height: 220,
@@ -378,8 +385,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   const Icon(Icons.fiber_manual_record,
                       color: Colors.red, size: 14),
                   const SizedBox(width: 8),
-                  Text('Recording ' +
-                      _formatAudioDuration(_recordingElapsed.inMilliseconds)),
+                  Text('Recording ${_formatAudioDuration(_recordingElapsed.inMilliseconds)}'),
                   const Spacer(),
                   const Text('Tap stop to send'),
                 ],
@@ -492,7 +498,7 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content:
-                  Text('Could not play voice message: ' + error.toString())),
+                  Text('Could not play voice message: $error')),
         );
       }
     } finally {
@@ -545,5 +551,5 @@ String _formatAudioDuration(int milliseconds) {
   final seconds = (milliseconds / 1000).floor();
   final minutesPart = (seconds ~/ 60).toString().padLeft(2, '0');
   final secondsPart = (seconds % 60).toString().padLeft(2, '0');
-  return minutesPart + ':' + secondsPart;
+  return '$minutesPart:$secondsPart';
 }

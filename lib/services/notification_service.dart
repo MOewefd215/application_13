@@ -70,7 +70,29 @@ class NotificationService {
     });
   }
 
+  Stream<int> unreadCountForUser(String userId) {
+    return _col
+        .where('user_id', isEqualTo: userId)
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .map((snap) => snap.docs.length);
+  }
+
   Future<void> markAsRead(String notificationId) {
     return _col.doc(notificationId).update({'read': true});
+  }
+
+  Future<void> markAllAsReadForUser(String userId) async {
+    final unread = await _col
+        .where('user_id', isEqualTo: userId)
+        .where('read', isEqualTo: false)
+        .get();
+    if (unread.docs.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final notification in unread.docs) {
+      batch.update(notification.reference, {'read': true});
+    }
+    await batch.commit();
   }
 }

@@ -12,6 +12,7 @@ import 'job_history_screen.dart';
 import 'chat_screen.dart';
 import 'profile_screen.dart';
 import 'post_job_screen.dart';
+import '../navigation/app_tab_navigation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +22,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int navIndex = 0;
   bool _loadingRole = true;
   bool _isEmployer = false; // ตาม role 3.1.1 ผู้จ้างงาน / 3.1.2 นักศึกษา
   final _jobService = JobService();
@@ -74,26 +74,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onNavTap(int index) {
-    if (index == navIndex) return;
-    switch (index) {
-      case 1:
-        Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const JobHistoryScreen()));
-        return;
-      case 2:
-        Navigator.push(
-            context, MaterialPageRoute(builder: (_) => const ChatScreen()));
-        return;
-      case 3:
-        Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const NotificationScreen()));
-        return;
-      case 4:
-        Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const ProfileScreen()));
-        return;
-    }
-    setState(() => navIndex = index);
+    navigateToAppTab(context, destinationIndex: index, currentIndex: 0);
   }
 
   List<JobModel> _applyFilters(List<JobModel> jobs) {
@@ -120,7 +101,7 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           : null,
       bottomNavigationBar:
-          StudentProBottomNav(currentIndex: navIndex, onTap: _onNavTap),
+          StudentProBottomNav(currentIndex: 0, onTap: _onNavTap),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),

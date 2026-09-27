@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/job_model.dart';
 import '../models/job_application_model.dart';
+import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../services/job_service.dart';
 import '../services/chat_service.dart';
@@ -38,11 +39,18 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   JobModel? _job;
   bool _loading = false;
   bool _acting = false;
+  String? _currentRole;
 
   @override
   void initState() {
     super.initState();
     if (widget.jobId != null) _loadJob();
+    _loadCurrentRole();
+  }
+
+  Future<void> _loadCurrentRole() async {
+    final role = await _authService.getUserRole();
+    if (mounted) setState(() => _currentRole = role);
   }
 
   Future<void> _loadJob() async {
@@ -192,7 +200,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                       Row(
                         children: [
                           if (isEmployer &&
-                              job != null &&
                               job.jobStatus == JobStatus.open)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
@@ -325,7 +332,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               const TextStyle(color: AppColors.textSecondary),
                         ),
                         if (isEmployer &&
-                            job != null &&
+                            _currentRole == UserRole.employer &&
                             job.jobStatus == JobStatus.open) ...[
                           const SizedBox(height: 20),
                           const Text('ผู้สมัครรับงาน',
@@ -416,7 +423,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             if (job != null)
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: _buildActionButton(job, isEmployer, uid),
+                child: _buildActionButton(job, isEmployer, uid, _currentRole),
               ),
           ],
         ),
@@ -424,7 +431,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildActionButton(JobModel job, bool isEmployer, String? uid) {
+  Widget _buildActionButton(
+    JobModel job,
+    bool isEmployer,
+    String? uid,
+    String? currentRole,
+  ) {
     if (_acting) {
       return const ElevatedButton(
         onPressed: null,
@@ -437,7 +449,17 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
 
     // นักศึกษา: งานยังว่าง ยังไม่มีใครรับ → สมัครรับงาน (รอผู้จ้างเลือก)
-    if (!isEmployer && job.stdId == null && job.jobStatus == JobStatus.open) {
+    if (currentRole == null) {
+      return const ElevatedButton(
+        onPressed: null,
+        child: Text('กำลังตรวจสอบสิทธิ์ผู้ใช้'),
+      );
+    }
+
+    if (currentRole == UserRole.student &&
+        !isEmployer &&
+        job.stdId == null &&
+        job.jobStatus == JobStatus.open) {
       if (uid == null) {
         return const ElevatedButton(
             onPressed: null, child: Text('กรุณาเข้าสู่ระบบก่อน'));
@@ -458,7 +480,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
 
     // ผู้จ้างงาน: มีนักศึกษารับงานแล้ว กำลังดำเนินการ → ยืนยันเสร็จ / ยกเลิก
-    if (isEmployer && job.jobStatus == JobStatus.process) {
+    if (isEmployer &&
+        currentRole == UserRole.employer &&
+        job.jobStatus == JobStatus.process) {
       return Row(
         children: [
           Expanded(
@@ -494,7 +518,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       }
     }
 
-    if (isEmployer && job.jobStatus == JobStatus.open) {
+    if (isEmployer &&
+        currentRole == UserRole.employer &&
+        job.jobStatus == JobStatus.open) {
       return const ElevatedButton(
         onPressed: null,
         child: Text('เลือกผู้สมัครจากรายชื่อด้านบน'),
@@ -526,7 +552,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   Widget _circleIcon(IconData icon, VoidCallback onTap) => GestureDetector(
         onTap: onTap,
         child: CircleAvatar(
-          backgroundColor: Colors.white.withOpacity(0.9),
+          backgroundColor: Colors.white.withValues(alpha: 0.9),
           child: Icon(icon, color: AppColors.textPrimary, size: 20),
         ),
       );

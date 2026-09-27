@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/job_model.dart';
 import '../models/job_application_model.dart';
+import '../models/user_role.dart';
 import 'notification_service.dart';
 
 /// Backs "หน้าโพสต์งาน" (post) and "หน้าแรก" (list) — was previously
@@ -9,8 +11,10 @@ import 'notification_service.dart';
 /// matching the JOBS table (ตารางที่ 3.4).
 class JobService {
   final FirebaseFirestore _db;
-  JobService({FirebaseFirestore? firestore})
-      : _db = firestore ?? FirebaseFirestore.instance;
+  final FirebaseAuth _auth;
+  JobService({FirebaseFirestore? firestore, FirebaseAuth? auth})
+      : _db = firestore ?? FirebaseFirestore.instance,
+        _auth = auth ?? FirebaseAuth.instance;
 
   CollectionReference<Map<String, dynamic>> get _jobs => _db.collection('jobs');
 
@@ -130,6 +134,15 @@ class JobService {
   /// [selectApplicant]. Replaces the old first-come-first-served
   /// `acceptJob`.
   Future<void> applyToJob({required String jobId, required String stdId}) async {
+    final signedInUser = _auth.currentUser;
+    if (signedInUser == null || signedInUser.uid != stdId) {
+      throw StateError('กรุณาเข้าสู่ระบบก่อนสมัครงาน');
+    }
+    final role = await _userRole(stdId);
+    if (role != UserRole.student) {
+      throw StateError('เฉพาะบัญชีนักศึกษาเท่านั้นที่สมัครรับงานได้');
+    }
+
     final already = await hasApplied(jobId: jobId, stdId: stdId);
     if (already) throw StateError('คุณสมัครงานนี้ไปแล้ว');
 
@@ -206,8 +219,16 @@ class JobService {
     required String jobId,
     required String stdId,
   }) async {
+    final signedInUser = _auth.currentUser;
+    if (signedInUser == null) {
+      throw StateError('กรุณาเข้าสู่ระบบก่อนเลือกผู้สมัคร');
+    }
     final job = await getJob(jobId);
     if (job == null) throw StateError('ไม่พบงานนี้');
+    if (job.empId != signedInUser.uid ||
+        await _userRole(signedInUser.uid) != UserRole.employer) {
+      throw StateError('เฉพาะผู้โพสต์งานเท่านั้นที่เลือกผู้สมัครได้');
+    }
     if (job.jobStatus != JobStatus.open) {
       throw StateError('งานนี้ไม่อยู่ในสถานะที่เลือกผู้สมัครได้');
     }
@@ -271,5 +292,10 @@ class JobService {
     final snap = await _jobs.doc(jobId).get();
     if (!snap.exists) return null;
     return JobModel.fromMap(snap.id, snap.data()!);
+  }
+
+  Future<String?> _userRole(String uid) async {
+    final user = await _db.collection('users').doc(uid).get();
+    return user.data()?['u_role'] as String?;
   }
 }

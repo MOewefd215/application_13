@@ -10,6 +10,7 @@ import 'edit_profile_screen.dart';
 import 'login_screen.dart';
 import '../services/review_service.dart';
 import '../models/review_model.dart';
+import '../navigation/app_tab_navigation.dart';
 
 enum VerificationOrWallet { verification, report }
 
@@ -67,7 +68,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      bottomNavigationBar: StudentProBottomNav(currentIndex: 4, onTap: (_) {}),
+      bottomNavigationBar: StudentProBottomNav(
+        currentIndex: 4,
+        onTap: (index) => navigateToAppTab(
+          context,
+          destinationIndex: index,
+          currentIndex: 4,
+        ),
+      ),
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
