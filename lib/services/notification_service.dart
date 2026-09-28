@@ -6,6 +6,8 @@ class NotificationModel {
   final String title;
   final String body;
   final String? jobId;
+  final String? roomId;
+  final String? type;
   final bool read;
   final DateTime? createdAt;
 
@@ -15,6 +17,8 @@ class NotificationModel {
     required this.title,
     required this.body,
     this.jobId,
+    this.roomId,
+    this.type,
     this.read = false,
     this.createdAt,
   });
@@ -26,6 +30,8 @@ class NotificationModel {
       title: map['title'] ?? '',
       body: map['body'] ?? '',
       jobId: map['job_id'] as String?,
+      roomId: map['room_id'] as String?,
+      type: map['type'] as String?,
       read: map['read'] ?? false,
       createdAt: (map['created_at'] as Timestamp?)?.toDate(),
     );
@@ -48,12 +54,16 @@ class NotificationService {
     required String title,
     required String body,
     String? jobId,
+    String? roomId,
+    String? type,
   }) {
     return _col.add({
       'user_id': userId,
       'title': title,
       'body': body,
       if (jobId != null) 'job_id': jobId,
+      if (roomId != null) 'room_id': roomId,
+      if (type != null) 'type': type,
       'read': false,
       'created_at': FieldValue.serverTimestamp(),
     });
@@ -68,6 +78,8 @@ class NotificationService {
     return query.snapshots().map((snap) {
       final items = snap.docs
           .map((d) => NotificationModel.fromMap(d.id, d.data()))
+          // Chat alerts belong to the Chat badge only, not this screen.
+          .where((notification) => notification.type != 'chat')
           .toList();
       items.sort((a, b) =>
           (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
@@ -78,9 +90,22 @@ class NotificationService {
   Stream<int> unreadCountForUser(String userId) {
     return _col
         .where('user_id', isEqualTo: userId)
-        .where('read', isEqualTo: false)
         .snapshots()
-        .map((snap) => snap.docs.length);
+        .map((snap) => snap.docs.where((doc) {
+              final data = doc.data();
+              return data['read'] != true && data['type'] != 'chat';
+            }).length);
+  }
+
+  /// Chat notifications are counted separately for the badge on the Chat tab.
+  Stream<int> unreadChatCountForUser(String userId) {
+    return _col
+        .where('user_id', isEqualTo: userId)
+        .snapshots()
+        .map((snap) => snap.docs.where((doc) {
+              final data = doc.data();
+              return data['read'] != true && data['type'] == 'chat';
+            }).length);
   }
 
   Future<void> markAsRead(String notificationId) {
@@ -88,14 +113,37 @@ class NotificationService {
   }
 
   Future<void> markAllAsReadForUser(String userId) async {
-    final unread = await _col
-        .where('user_id', isEqualTo: userId)
-        .where('read', isEqualTo: false)
-        .get();
-    if (unread.docs.isEmpty) return;
+    final snapshot = await _col.where('user_id', isEqualTo: userId).get();
+    final unread = snapshot.docs.where((doc) {
+      final data = doc.data();
+      return data['read'] != true && data['type'] != 'chat';
+    });
+    if (unread.isEmpty) return;
 
     final batch = _db.batch();
-    for (final notification in unread.docs) {
+    for (final notification in unread) {
+      batch.update(notification.reference, {'read': true});
+    }
+    await batch.commit();
+  }
+
+  /// Marks messages from one conversation as read when that conversation is
+  /// actually opened. Merely viewing the chat list must not clear the badge.
+  Future<void> markChatRoomAsReadForUser({
+    required String userId,
+    required String roomId,
+  }) async {
+    final snapshot = await _col.where('user_id', isEqualTo: userId).get();
+    final unreadChat = snapshot.docs.where((doc) {
+      final data = doc.data();
+      return data['read'] != true &&
+          data['type'] == 'chat' &&
+          data['room_id'] == roomId;
+    });
+    if (unreadChat.isEmpty) return;
+
+    final batch = _db.batch();
+    for (final notification in unreadChat) {
       batch.update(notification.reference, {'read': true});
     }
     await batch.commit();

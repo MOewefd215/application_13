@@ -244,6 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           color: AppColors.card,
                           borderRadius: BorderRadius.circular(AppRadius.card),
                           border: Border.all(color: AppColors.border),
+                          boxShadow: AppShadows.card,
                         ),
                         child: const EmptyState(
                           icon: Icons.rate_review_outlined,
@@ -261,6 +262,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   borderRadius:
                                       BorderRadius.circular(AppRadius.card),
                                   border: Border.all(color: AppColors.border),
+                                  boxShadow: AppShadows.card,
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,

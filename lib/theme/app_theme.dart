@@ -4,30 +4,50 @@ import 'package:flutter/material.dart';
 /// Colors and shapes are matched to the reference mockups:
 /// navy header, white rounded cards, amber rating stars.
 class AppColors {
-  static const Color navy = Color(0xFF48B9E8);
-  static const Color navyDark = Color(0xFF167EAA);
-  static const Color blue = Color(0xFF48B9E8);
-  static const Color background = Color(0xFFF2F9FC);
+  static const Color navy = Color(0xFF4DC2F0);
+  static const Color navyDark = Color(0xFF178ABA);
+  static const Color blue = Color(0xFF55C4F1);
+  static const Color background = Color(0xFFFAFDFF);
   static const Color card = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF1D3040);
-  static const Color textSecondary = Color(0xFF8495A3);
-  static const Color border = Color(0xFFE1EDF2);
-  static const Color success = Color(0xFF48C7A7);
+  static const Color textPrimary = Color(0xFF263544);
+  static const Color textSecondary = Color(0xFF81909D);
+  static const Color border = Color(0xFFE8F0F5);
+  static const Color success = Color(0xFF55C9AE);
   static const Color danger = Color(0xFFEF737A);
-  static const Color star = Color(0xFFFFB84D);
-  static const Color purple = Color(0xFF858AD0);
-  static const Color mint = Color(0xFF57C9C0);
-  static const Color yellow = Color(0xFFFFBD4A);
-  static const Color coral = Color(0xFFEE8C84);
-  static const Color paleBlue = Color(0xFFE4F5FC);
-  static const Color paleMint = Color(0xFFE5F8F5);
+  static const Color star = Color(0xFFFFB33F);
+  static const Color purple = Color(0xFF7F8DCC);
+  static const Color mint = Color(0xFF59D0CD);
+  static const Color yellow = Color(0xFFFFC454);
+  static const Color coral = Color(0xFFFFA66E);
+  static const Color paleBlue = Color(0xFFEAF8FF);
+  static const Color paleMint = Color(0xFFE8FBF7);
+  static const Color paleYellow = Color(0xFFFFF6DC);
+  static const Color paleOrange = Color(0xFFFFEEE2);
 }
 
 class AppRadius {
-  static const double card = 24;
-  static const double field = 17;
-  static const double button = 17;
-  static const double chip = 20;
+  static const double card = 28;
+  static const double field = 22;
+  static const double button = 24;
+  static const double chip = 24;
+}
+
+class AppShadows {
+  static const card = [
+    BoxShadow(
+      color: Color(0x120B7AA9),
+      blurRadius: 22,
+      offset: Offset(0, 8),
+    ),
+  ];
+
+  static const floating = [
+    BoxShadow(
+      color: Color(0x1A168BB7),
+      blurRadius: 24,
+      offset: Offset(0, 9),
+    ),
+  ];
 }
 
 class AppTheme {
@@ -40,7 +60,7 @@ class AppTheme {
         seedColor: AppColors.navy,
         primary: AppColors.blue,
         secondary: AppColors.mint,
-        background: AppColors.background,
+        surface: AppColors.card,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.card,
@@ -59,8 +79,8 @@ class AppTheme {
       cardTheme: CardThemeData(
         color: AppColors.card,
         surfaceTintColor: Colors.transparent,
-        elevation: 2,
-        shadowColor: AppColors.navy.withValues(alpha: 0.08),
+        elevation: 0,
+        shadowColor: Colors.transparent,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.card),
           side: const BorderSide(color: AppColors.border),
@@ -78,7 +98,7 @@ class AppTheme {
         selectedColor: AppColors.blue,
         secondarySelectedColor: AppColors.blue,
         disabledColor: AppColors.border,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.chip),
           side: const BorderSide(color: AppColors.border),
@@ -109,7 +129,7 @@ class AppTheme {
         filled: true,
         fillColor: AppColors.card,
         contentPadding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.field),
           borderSide: const BorderSide(color: AppColors.border),
@@ -128,8 +148,9 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.navy,
           foregroundColor: Colors.white,
-          minimumSize: const Size.fromHeight(52),
-          elevation: 0,
+          minimumSize: const Size.fromHeight(56),
+          elevation: 2,
+          shadowColor: AppColors.navy.withValues(alpha: 0.20),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
           ),
@@ -139,7 +160,7 @@ class AppTheme {
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.textPrimary,
-          minimumSize: const Size.fromHeight(52),
+          minimumSize: const Size.fromHeight(56),
           side: const BorderSide(color: AppColors.border),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadius.button),
@@ -150,14 +171,14 @@ class AppTheme {
         backgroundColor: AppColors.card,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(AppRadius.card),
         ),
       ),
       snackBarTheme: SnackBarThemeData(
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.navy,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(AppRadius.button),
         ),
         contentTextStyle: const TextStyle(color: Colors.white),
       ),
@@ -190,12 +211,13 @@ class EmptyState extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 42),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
           Container(
               width: 76,
               height: 76,
               decoration: const BoxDecoration(
-                  color: AppColors.paleBlue, shape: BoxShape.circle),
+                  color: AppColors.paleYellow, shape: BoxShape.circle),
               child: Icon(icon, size: 34, color: AppColors.blue)),
           const SizedBox(height: 12),
           Text(

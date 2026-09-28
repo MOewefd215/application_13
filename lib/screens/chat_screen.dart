@@ -6,6 +6,7 @@ import 'package:record/record.dart';
 import '../theme/app_theme.dart';
 import '../services/chat_service.dart';
 import '../services/auth_service.dart';
+import '../services/notification_service.dart';
 import '../models/chat_models.dart';
 import '../services/upload_service.dart';
 import '../widgets/bottom_nav.dart';
@@ -130,6 +131,19 @@ class _ConversationScreenState extends State<ConversationScreen> {
   final AudioRecorder _audioRecorder = AudioRecorder();
   final Stopwatch _recordingClock = Stopwatch();
   Timer? _recordingTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    final uid = AuthService().currentUser?.uid;
+    final roomId = widget.roomId;
+    if (uid != null && roomId != null) {
+      unawaited(NotificationService().markChatRoomAsReadForUser(
+        userId: uid,
+        roomId: roomId,
+      ));
+    }
+  }
 
   @override
   void dispose() {

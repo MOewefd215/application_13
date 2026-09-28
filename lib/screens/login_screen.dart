@@ -115,6 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   color: AppColors.card,
                   borderRadius: BorderRadius.circular(AppRadius.button),
                   border: Border.all(color: AppColors.border),
+                  boxShadow: AppShadows.card,
                 ),
                 child: Row(
                   children: [
@@ -341,6 +342,7 @@ class _LoginScreenState extends State<LoginScreen> {
           borderRadius: BorderRadius.circular(AppRadius.button),
           border: Border.all(
               color: selected ? AppColors.navy : AppColors.border),
+          boxShadow: selected ? AppShadows.card : null,
         ),
         child: Column(
           children: [

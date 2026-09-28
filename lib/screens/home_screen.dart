@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../widgets/bottom_nav.dart';
 import '../services/auth_service.dart';
 import '../services/job_service.dart';
 import '../services/location_service.dart';
+import '../services/push_notification_service.dart';
 import '../models/user_role.dart';
 import '../models/job_model.dart';
 import 'job_detail_screen.dart';
@@ -40,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadRole();
     _loadMyLocation();
+    unawaited(PushNotificationService().enableForCurrentUser());
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.trim());
     });
@@ -118,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
           StudentProBottomNav(currentIndex: 0, onTap: _onNavTap),
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
           children: [
             Row(
               children: [
@@ -129,14 +133,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     child: Row(
                       children: [
                         CircleAvatar(
-                          radius: 22,
-                          backgroundColor: AppColors.border,
+                          radius: 25,
+                          backgroundColor: AppColors.paleYellow,
                           backgroundImage: _profilePhotoUrl == null
                               ? null
                               : NetworkImage(_profilePhotoUrl!),
                           child: _profilePhotoUrl == null
                               ? const Icon(Icons.person,
-                                  color: AppColors.textSecondary)
+                                  color: AppColors.navyDark)
                               : null,
                         ),
                         const SizedBox(width: 12),
@@ -162,12 +166,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(Icons.notifications_none),
+                Container(
+                  decoration: const BoxDecoration(
+                    color: AppColors.paleYellow,
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                  icon: const Icon(Icons.notifications_none_rounded),
                   onPressed: () => Navigator.push(
                       context,
                       MaterialPageRoute(
                           builder: (_) => const NotificationScreen())),
+                  ),
                 ),
               ],
             ),
@@ -190,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Banner
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.all(20),
+              padding: const EdgeInsets.all(22),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [AppColors.blue, AppColors.mint],
@@ -198,23 +208,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(AppRadius.card),
-                boxShadow: [
-                  BoxShadow(
-                      color: AppColors.navy.withValues(alpha: 0.14),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8)),
+                boxShadow: const [
+                  ...AppShadows.floating,
                 ],
               ),
-              child: Stack(
+              child: const Stack(
                 children: [
-                  const Positioned(
+                  Positioned(
                     right: 0,
                     top: 0,
                     bottom: 0,
                     child: Icon(Icons.school_rounded,
                         color: Color(0x44FFFFFF), size: 96),
                   ),
-                  const Column(
+                  Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('งานใกล้คุณ',
@@ -232,81 +239,60 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 20),
 
-            // Colorful category tiles inspired by the reference cards.
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: List.generate(jobCategories.length, (index) {
-                final category = jobCategories[index];
-                final label = category['label'] as String;
-                final selected = _selectedCategory == label;
-                final accent = const [
-                  AppColors.blue,
-                  AppColors.yellow,
-                  AppColors.mint,
-                  AppColors.purple,
-                  AppColors.coral,
-                ][index % 5];
-                final tileWidth = (MediaQuery.sizeOf(context).width - 42) / 2;
-                return GestureDetector(
-                  onTap: () => setState(
-                    () => _selectedCategory = selected ? null : label,
-                  ),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    width: tileWidth,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 11),
-                    decoration: BoxDecoration(
-                      color: selected ? accent : AppColors.card,
-                      borderRadius: BorderRadius.circular(AppRadius.chip),
-                      border: Border.all(
-                          color: selected ? accent : AppColors.border),
-                      boxShadow: selected
-                          ? [
-                              BoxShadow(
-                                color: accent.withValues(alpha: 0.16),
-                                blurRadius: 12,
-                                offset: const Offset(0, 4),
-                              ),
-                            ]
-                          : null,
+            // Categories — original horizontal selector. The filter behaviour
+            // remains unchanged; only the presentation is restored.
+            SizedBox(
+              height: 84,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: jobCategories.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 16),
+                itemBuilder: (context, index) {
+                  final category = jobCategories[index];
+                  final label = category['label'] as String;
+                  final selected = _selectedCategory == label;
+                  return GestureDetector(
+                    onTap: () => setState(
+                      () => _selectedCategory = selected ? null : label,
                     ),
-                    child: Row(
+                    child: Column(
                       children: [
-                        Container(
-                          width: 34,
-                          height: 34,
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          width: 56,
+                          height: 56,
                           decoration: BoxDecoration(
-                            color: selected
-                                ? Colors.white.withValues(alpha: 0.22)
-                                : accent.withValues(alpha: 0.14),
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(category['icon'] as IconData,
-                              size: 18,
-                              color: selected ? Colors.white : accent),
-                        ),
-                        const SizedBox(width: 9),
-                        Expanded(
-                          child: Text(
-                            label,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                            color: selected ? AppColors.navy : AppColors.card,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
                               color: selected
-                                  ? Colors.white
-                                  : AppColors.textPrimary,
+                                  ? AppColors.navy
+                                  : AppColors.border,
                             ),
+                          ),
+                          child: Icon(
+                            category['icon'] as IconData,
+                            color: selected ? Colors.white : AppColors.navy,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: selected
+                                ? FontWeight.w700
+                                : FontWeight.normal,
+                            color: selected
+                                ? AppColors.navy
+                                : AppColors.textPrimary,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                );
-              }),
+                  );
+                },
+              ),
             ),
             const SizedBox(height: 24),
 
@@ -411,6 +397,7 @@ class JobCard extends StatelessWidget {
           color: AppColors.card,
           borderRadius: BorderRadius.circular(AppRadius.card),
           border: Border.all(color: AppColors.border),
+          boxShadow: AppShadows.card,
         ),
         child: Row(
           children: [

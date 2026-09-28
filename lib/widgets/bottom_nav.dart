@@ -27,34 +27,32 @@ class StudentProBottomNav extends StatelessWidget {
       initialData: 0,
       builder: (context, snapshot) {
         final unread = snapshot.data ?? 0;
-        return Container(
-          decoration: BoxDecoration(
-            color: AppColors.card,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.textPrimary.withValues(alpha: 0.05),
-                blurRadius: 18,
-                offset: const Offset(0, -5),
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(AppRadius.card),
+                boxShadow: AppShadows.floating,
               ),
-            ],
-          ),
-          child: SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-              child: Row(
-                children: [
-                  _destination(0, Icons.home_rounded, 'หน้าหลัก'),
-                  _destination(1, Icons.work_outline_rounded, 'งานของฉัน'),
-                  _destination(2, Icons.chat_bubble_outline_rounded, 'แชท'),
-                  _destination(
-                    3,
-                    Icons.notifications_none_rounded,
-                    'แจ้งเตือน',
-                    badgeCount: unread,
-                  ),
-                  _destination(4, Icons.person_outline_rounded, 'โปรไฟล์'),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+                child: Row(
+                  children: [
+                    _destination(0, Icons.home_rounded, 'หน้าหลัก'),
+                    _destination(1, Icons.work_outline_rounded, 'งานของฉัน'),
+                    _chatDestination(),
+                    _destination(
+                      3,
+                      Icons.notifications_none_rounded,
+                      'แจ้งเตือน',
+                      badgeCount: unread,
+                    ),
+                    _destination(4, Icons.person_outline_rounded, 'โปรไฟล์'),
+                  ],
+                ),
               ),
             ),
           ),
@@ -75,14 +73,14 @@ class StudentProBottomNav extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 2),
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(AppRadius.chip),
           onTap: () => onTap(index),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 3),
+            padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 3),
             decoration: BoxDecoration(
               color: selected ? AppColors.blue : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(AppRadius.chip),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -105,6 +103,24 @@ class StudentProBottomNav extends StatelessWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _chatDestination() {
+    final uid = AuthService().currentUser?.uid;
+    final unreadChat = uid == null
+        ? Stream<int>.value(0)
+        : NotificationService().unreadChatCountForUser(uid);
+
+    return StreamBuilder<int>(
+      stream: unreadChat,
+      initialData: 0,
+      builder: (context, snapshot) => _destination(
+        2,
+        Icons.chat_bubble_outline_rounded,
+        'แชท',
+        badgeCount: snapshot.data ?? 0,
       ),
     );
   }

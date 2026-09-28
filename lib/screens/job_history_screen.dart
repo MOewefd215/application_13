@@ -180,9 +180,10 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: AppColors.border),
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppShadows.card,
           ),
           child: InkWell(
             onTap: job == null
@@ -236,6 +237,7 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
         color: AppColors.card,
         borderRadius: BorderRadius.circular(AppRadius.card),
         border: Border.all(color: AppColors.border),
+        boxShadow: AppShadows.card,
       ),
       child: InkWell(
         onTap: () => Navigator.push(
@@ -284,9 +286,10 @@ class _JobHistoryScreenState extends State<JobHistoryScreen> {
           margin: const EdgeInsets.all(16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.card,
-            borderRadius: BorderRadius.circular(AppRadius.card),
-            border: Border.all(color: AppColors.border),
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          border: Border.all(color: AppColors.border),
+          boxShadow: AppShadows.card,
           ),
           child: Column(
             children: [

@@ -1,0 +1,190 @@
+rules_version = '2';
+
+// Security rules for the "มือโปรวัยเรียน" app.
+// These rules require Firebase Authentication for every Firestore request.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.u_role;
+    }
+
+    function isEmployer() {
+      return signedIn() && userRole() == 'employer';
+    }
+
+    function isStudent() {
+      return signedIn() && userRole() == 'student';
+    }
+
+    function job(jobId) {
+      return get(/databases/$(database)/documents/jobs/$(jobId));
+    }
+
+    function ownsJob(jobId) {
+      return signedIn() && job(jobId).data.emp_id == request.auth.uid;
+    }
+
+    function isAssignedStudent(jobId) {
+      return signedIn() && job(jobId).data.std_id == request.auth.uid;
+    }
+
+    function isRoomMember(roomId) {
+      return signedIn() &&
+          get(/databases/$(database)/documents/chat_rooms/$(roomId))
+              .data.participant_ids.hasAny([request.auth.uid]);
+    }
+
+    function roomHasUser(roomId, userId) {
+      return get(/databases/$(database)/documents/chat_rooms/$(roomId))
+          .data.participant_ids.hasAny([userId]);
+    }
+
+    match /users/{userId} {
+      allow create: if signedIn() && userId == request.auth.uid
+          && request.resource.data.u_role in ['employer', 'student'];
+      allow read: if signedIn();
+      // The role cannot be changed from the app after registration.
+      allow update, delete: if false;
+    }
+
+    // Public profile data. Each user may write only their own role profile.
+    match /employers/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && userId == request.auth.uid
+          && userRole() == 'employer';
+      allow delete: if false;
+    }
+
+    match /students/{userId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && userId == request.auth.uid
+          && userRole() == 'student';
+      allow delete: if false;
+    }
+
+    // One FCM device token per signed-in user. The Worker uses its own
+    // service-account credentials to read this document when sending push.
+    match /devices/{userId} {
+      allow create, update: if signedIn() && userId == request.auth.uid;
+      allow read, delete: if false;
+    }
+
+    match /jobs/{jobId} {
+      allow read: if signedIn();
+      allow create: if isEmployer()
+          && request.resource.data.emp_id == request.auth.uid
+          && request.resource.data.job_status == 'Open'
+          && request.resource.data.std_id == null;
+      // The poster controls their job but cannot transfer ownership.
+      allow update: if (ownsJob(jobId)
+          && request.resource.data.emp_id == resource.data.emp_id)
+          || (isAssignedStudent(jobId)
+              && request.resource.data.diff(resource.data)
+                  .affectedKeys().hasOnly(['job_status'])
+              && request.resource.data.job_status == 'Cancel');
+      allow delete: if ownsJob(jobId) && resource.data.job_status == 'Open';
+    }
+
+    match /job_applications/{applicationId} {
+      allow create: if isStudent()
+          && request.resource.data.student_id == request.auth.uid
+          && request.resource.data.status == 'pending'
+          && job(request.resource.data.job_id).data.job_status == 'Open';
+      // A student sees their applications; a job owner sees applicants.
+      allow read: if signedIn()
+          && (resource.data.student_id == request.auth.uid
+              || ownsJob(resource.data.job_id));
+      // Only the poster can accept/reject candidates. Job and applicant stay fixed.
+      allow update: if ownsJob(resource.data.job_id)
+          && request.resource.data.job_id == resource.data.job_id
+          && request.resource.data.student_id == resource.data.student_id
+          && request.resource.data.diff(resource.data)
+              .affectedKeys().hasOnly(['status'])
+          && request.resource.data.status in ['accepted', 'rejected'];
+      allow delete: if false;
+    }
+
+    match /chat_rooms/{roomId} {
+      allow create: if signedIn()
+          && request.resource.data.participant_ids.size() == 2
+          && request.resource.data.participant_ids.hasAny([request.auth.uid]);
+      // Use `resource` here so Firestore can safely evaluate a query that
+      // lists all rooms belonging to the signed-in user.
+      allow read: if signedIn()
+          && resource.data.participant_ids.hasAny([request.auth.uid]);
+      allow update: if signedIn()
+          && resource.data.participant_ids.hasAny([request.auth.uid])
+          && request.resource.data.participant_ids.size() == 2
+          // The same two users may be listed in a different order, but no
+          // participant may be added, removed, or replaced.
+          && request.resource.data.participant_ids
+              .hasOnly(resource.data.participant_ids)
+          && resource.data.participant_ids
+              .hasOnly(request.resource.data.participant_ids);
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow read: if isRoomMember(roomId);
+        allow create: if isRoomMember(roomId)
+            && request.resource.data.sender_id == request.auth.uid;
+        allow update, delete: if false;
+      }
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.user_id == request.auth.uid;
+      // A user may mark only their own notification as read.
+      allow update: if signedIn()
+          && resource.data.user_id == request.auth.uid
+          && request.resource.data.diff(resource.data)
+              .affectedKeys().hasOnly(['read']);
+      // App events may notify the job owner/student. Self-notifications are safe
+      // for the cancellation flow currently implemented in the app.
+      allow create: if signedIn() && (
+          request.resource.data.user_id == request.auth.uid
+          || (isStudent()
+              && job(request.resource.data.job_id).data.emp_id
+                  == request.resource.data.user_id)
+          || (ownsJob(request.resource.data.job_id)
+              && job(request.resource.data.job_id).data.std_id
+                  == request.resource.data.user_id)
+          || (request.resource.data.type == 'chat'
+              && request.resource.data.room_id is string
+              && isRoomMember(request.resource.data.room_id)
+              && roomHasUser(
+                  request.resource.data.room_id,
+                  request.resource.data.user_id)));
+      allow delete: if false;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if signedIn();
+      allow create: if isEmployer()
+          && request.resource.data.reviewer_id == request.auth.uid
+          && job(request.resource.data.job_id).data.emp_id == request.auth.uid
+          && job(request.resource.data.job_id).data.std_id
+              == request.resource.data.reviewee_id
+          && job(request.resource.data.job_id).data.job_status == 'Done'
+          && request.resource.data.rating is int
+          && request.resource.data.rating >= 1
+          && request.resource.data.rating <= 5;
+      allow update, delete: if false;
+    }
+
+    match /reports/{reportId} {
+      allow create: if signedIn()
+          && request.resource.data.reporter_id == request.auth.uid;
+      allow read: if signedIn() && resource.data.reporter_id == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Any collection not listed above is closed by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

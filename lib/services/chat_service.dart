@@ -1,5 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/chat_models.dart';
+import 'notification_service.dart';
+import 'push_notification_service.dart';
 
 /// Real-time chat backing "หน้าแชท" (3.3.4) — restores working
 /// employer <-> student messaging using a deterministic chatRoomId
@@ -25,16 +27,19 @@ class ChatService {
   }) async {
     final roomId = chatRoomId(uidA, uidB);
     final doc = _rooms.doc(roomId);
-    final snap = await doc.get();
-    if (!snap.exists) {
-      await doc.set({
-        'participant_ids': [uidA, uidB],
-        'job_id': jobId,
-        'job_title': jobTitle,
-        'last_message': null,
-        'last_message_at': FieldValue.serverTimestamp(),
-      });
-    }
+
+    // Do not read the room before creating it. A brand-new room has no
+    // participants yet, so the Firestore Rules correctly deny that read.
+    // `set(merge: true)` creates a new room for either participant, or safely
+    // reuses an existing room where the caller is already a participant.
+    await doc.set({
+      'participant_ids': [uidA, uidB],
+      'job_id': jobId,
+      'job_title': jobTitle,
+      'last_message': null,
+      'last_message_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+
     return roomId;
   }
 
@@ -51,6 +56,11 @@ class ChatService {
       'last_message': text.trim(),
       'last_message_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    await _notifyRecipient(
+      roomId: roomId,
+      senderId: senderId,
+      preview: text.trim(),
+    );
   }
 
   Future<void> sendImageMessage({
@@ -67,6 +77,11 @@ class ChatService {
       'last_message': '[Image]',
       'last_message_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    await _notifyRecipient(
+      roomId: roomId,
+      senderId: senderId,
+      preview: 'ส่งรูปภาพ',
+    );
   }
 
   Future<void> sendAudioMessage({
@@ -85,6 +100,42 @@ class ChatService {
       'last_message': '[Voice message]',
       'last_message_at': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
+    await _notifyRecipient(
+      roomId: roomId,
+      senderId: senderId,
+      preview: 'ส่งข้อความเสียง',
+    );
+  }
+
+  Future<void> _notifyRecipient({
+    required String roomId,
+    required String senderId,
+    required String preview,
+  }) async {
+    final room = await _rooms.doc(roomId).get();
+    final data = room.data();
+    if (data == null) return;
+
+    final participantIds = List<String>.from(data['participant_ids'] ?? []);
+    final recipientId = participantIds.firstWhere(
+      (id) => id != senderId,
+      orElse: () => '',
+    );
+    if (recipientId.isEmpty) return;
+
+    await NotificationService().create(
+      userId: recipientId,
+      title: 'มีข้อความแชตใหม่',
+      body: preview,
+      jobId: data['job_id'] as String?,
+      roomId: roomId,
+      type: 'chat',
+    );
+    await PushNotificationService().sendChatPush(
+      roomId: roomId,
+      recipientId: recipientId,
+      body: preview,
+    );
   }
 
   Stream<List<ChatMessageModel>> messagesInRoom(String roomId) {

@@ -102,6 +102,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                     borderRadius:
                                         BorderRadius.circular(AppRadius.card),
                                     border: Border.all(color: AppColors.border),
+                                    boxShadow: AppShadows.card,
                                   ),
                                   child: ListTile(
                                     contentPadding: EdgeInsets.zero,
@@ -170,6 +171,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
           color: selected ? AppColors.navy : AppColors.card,
           borderRadius: BorderRadius.circular(AppRadius.button),
           border: Border.all(color: AppColors.border),
+          boxShadow: selected ? AppShadows.card : null,
         ),
         alignment: Alignment.center,
         child: Text(
