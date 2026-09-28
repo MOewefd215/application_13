@@ -193,7 +193,7 @@ class _HomeScreenState extends State<HomeScreen> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [AppColors.navy, AppColors.blue],
+                  colors: [AppColors.blue, AppColors.mint],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -205,67 +205,108 @@ class _HomeScreenState extends State<HomeScreen> {
                       offset: const Offset(0, 8)),
                 ],
               ),
-              child: const Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  Text('งานใกล้คุณ',
-                      style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700)),
-                  SizedBox(height: 4),
-                  Text('รายได้ดี เริ่มต้นที่นี่!',
-                      style: TextStyle(color: Colors.white70)),
+                  const Positioned(
+                    right: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: Icon(Icons.school_rounded,
+                        color: Color(0x44FFFFFF), size: 96),
+                  ),
+                  const Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('งานใกล้คุณ',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w700)),
+                      SizedBox(height: 4),
+                      Text('รายได้ดี เริ่มต้นที่นี่!',
+                          style: TextStyle(color: Colors.white70)),
+                    ],
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
-            // Categories — แตะเพื่อกรอง, แตะซ้ำเพื่อยกเลิกกรอง
-            SizedBox(
-              height: 84,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                itemCount: jobCategories.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 16),
-                itemBuilder: (context, index) {
-                  final c = jobCategories[index];
-                  final label = c['label'] as String;
-                  final selected = _selectedCategory == label;
-                  return GestureDetector(
-                    onTap: () => setState(
-                        () => _selectedCategory = selected ? null : label),
-                    child: Column(
+            // Colorful category tiles inspired by the reference cards.
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: List.generate(jobCategories.length, (index) {
+                final category = jobCategories[index];
+                final label = category['label'] as String;
+                final selected = _selectedCategory == label;
+                final accent = const [
+                  AppColors.blue,
+                  AppColors.yellow,
+                  AppColors.mint,
+                  AppColors.purple,
+                  AppColors.coral,
+                ][index % 5];
+                final tileWidth = (MediaQuery.sizeOf(context).width - 42) / 2;
+                return GestureDetector(
+                  onTap: () => setState(
+                    () => _selectedCategory = selected ? null : label,
+                  ),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    width: tileWidth,
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 11),
+                    decoration: BoxDecoration(
+                      color: selected ? accent : AppColors.card,
+                      borderRadius: BorderRadius.circular(AppRadius.chip),
+                      border: Border.all(
+                          color: selected ? accent : AppColors.border),
+                      boxShadow: selected
+                          ? [
+                              BoxShadow(
+                                color: accent.withValues(alpha: 0.16),
+                                blurRadius: 12,
+                                offset: const Offset(0, 4),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Row(
                       children: [
                         Container(
-                          width: 56,
-                          height: 56,
+                          width: 34,
+                          height: 34,
                           decoration: BoxDecoration(
-                            color: selected ? AppColors.navy : AppColors.card,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                                color: selected
-                                    ? AppColors.navy
-                                    : AppColors.border),
+                            color: selected
+                                ? Colors.white.withValues(alpha: 0.22)
+                                : accent.withValues(alpha: 0.14),
+                            shape: BoxShape.circle,
                           ),
-                          child: Icon(c['icon'] as IconData,
-                              color: selected ? Colors.white : AppColors.navy),
+                          child: Icon(category['icon'] as IconData,
+                              size: 18,
+                              color: selected ? Colors.white : accent),
                         ),
-                        const SizedBox(height: 6),
-                        Text(label,
+                        const SizedBox(width: 9),
+                        Expanded(
+                          child: Text(
+                            label,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: selected
-                                    ? FontWeight.w700
-                                    : FontWeight.normal,
-                                color: selected
-                                    ? AppColors.navy
-                                    : AppColors.textPrimary)),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: selected
+                                  ? Colors.white
+                                  : AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              }),
             ),
             const SizedBox(height: 24),
 

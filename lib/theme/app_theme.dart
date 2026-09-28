@@ -4,23 +4,29 @@ import 'package:flutter/material.dart';
 /// Colors and shapes are matched to the reference mockups:
 /// navy header, white rounded cards, amber rating stars.
 class AppColors {
-  static const Color navy = Color(0xFF16233F);
-  static const Color navyDark = Color(0xFF0F1A30);
-  static const Color blue = Color(0xFF3D6FE8);
-  static const Color background = Color(0xFFF5F7FC);
+  static const Color navy = Color(0xFF48B9E8);
+  static const Color navyDark = Color(0xFF167EAA);
+  static const Color blue = Color(0xFF48B9E8);
+  static const Color background = Color(0xFFF2F9FC);
   static const Color card = Color(0xFFFFFFFF);
-  static const Color textPrimary = Color(0xFF16233F);
-  static const Color textSecondary = Color(0xFF8A93A6);
-  static const Color border = Color(0xFFE6EAF2);
-  static const Color success = Color(0xFF34C471);
-  static const Color danger = Color(0xFFEF4444);
-  static const Color star = Color(0xFFFFB020);
+  static const Color textPrimary = Color(0xFF1D3040);
+  static const Color textSecondary = Color(0xFF8495A3);
+  static const Color border = Color(0xFFE1EDF2);
+  static const Color success = Color(0xFF48C7A7);
+  static const Color danger = Color(0xFFEF737A);
+  static const Color star = Color(0xFFFFB84D);
+  static const Color purple = Color(0xFF858AD0);
+  static const Color mint = Color(0xFF57C9C0);
+  static const Color yellow = Color(0xFFFFBD4A);
+  static const Color coral = Color(0xFFEE8C84);
+  static const Color paleBlue = Color(0xFFE4F5FC);
+  static const Color paleMint = Color(0xFFE5F8F5);
 }
 
 class AppRadius {
-  static const double card = 20;
-  static const double field = 14;
-  static const double button = 14;
+  static const double card = 24;
+  static const double field = 17;
+  static const double button = 17;
   static const double chip = 20;
 }
 
@@ -32,12 +38,12 @@ class AppTheme {
       fontFamily: 'NotoSansThai',
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.navy,
-        primary: AppColors.navy,
-        secondary: AppColors.blue,
+        primary: AppColors.blue,
+        secondary: AppColors.mint,
         background: AppColors.background,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
+        backgroundColor: AppColors.card,
         surfaceTintColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
@@ -48,6 +54,55 @@ class AppTheme {
           fontSize: 19,
           fontWeight: FontWeight.w700,
           fontFamily: 'NotoSansThai',
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.card,
+        surfaceTintColor: Colors.transparent,
+        elevation: 2,
+        shadowColor: AppColors.navy.withValues(alpha: 0.08),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.card),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        margin: EdgeInsets.zero,
+      ),
+      iconTheme: const IconThemeData(color: AppColors.textPrimary),
+      listTileTheme: const ListTileThemeData(
+        iconColor: AppColors.blue,
+        textColor: AppColors.textPrimary,
+        contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.paleBlue,
+        selectedColor: AppColors.blue,
+        secondarySelectedColor: AppColors.blue,
+        disabledColor: AppColors.border,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.chip),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        labelStyle: const TextStyle(color: AppColors.textPrimary),
+        secondaryLabelStyle: const TextStyle(color: Colors.white),
+      ),
+      progressIndicatorTheme: const ProgressIndicatorThemeData(
+        color: AppColors.blue,
+        linearTrackColor: AppColors.paleBlue,
+      ),
+      floatingActionButtonTheme: FloatingActionButtonThemeData(
+        backgroundColor: AppColors.navy,
+        foregroundColor: Colors.white,
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadius.button),
+        ),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.card,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
@@ -83,7 +138,7 @@ class AppTheme {
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
-          foregroundColor: AppColors.navy,
+          foregroundColor: AppColors.textPrimary,
           minimumSize: const Size.fromHeight(52),
           side: const BorderSide(color: AppColors.border),
           shape: RoundedRectangleBorder(
@@ -140,7 +195,7 @@ class EmptyState extends StatelessWidget {
               width: 76,
               height: 76,
               decoration: const BoxDecoration(
-                  color: Color(0xFFEAF0FF), shape: BoxShape.circle),
+                  color: AppColors.paleBlue, shape: BoxShape.circle),
               child: Icon(icon, size: 34, color: AppColors.blue)),
           const SizedBox(height: 12),
           Text(
