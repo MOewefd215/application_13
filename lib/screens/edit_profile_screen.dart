@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../models/app_user_model.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
+import '../services/upload_service.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final AppUserModel user;
@@ -20,8 +21,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   late final TextEditingController _extraController =
       TextEditingController(text: widget.user.universityOrAddress ?? '');
   bool _saving = false;
+  bool _uploadingPhoto = false;
+  String? _photoUrl;
+  final _uploadService = UploadService();
 
   bool get _isEmployer => widget.user.role == UserRole.employer;
+
+  @override
+  void initState() {
+    super.initState();
+    _photoUrl = widget.user.photoUrl;
+  }
+
+  Future<void> _pickProfilePhoto() async {
+    setState(() => _uploadingPhoto = true);
+    try {
+      final url = await _uploadService.pickAndUploadImage();
+      if (url != null && mounted) setState(() => _photoUrl = url);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('อัปโหลดรูปไม่สำเร็จ: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingPhoto = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -44,6 +70,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         fullName: _nameController.text.trim(),
         phone: _phoneController.text.trim(),
         universityOrAddress: _extraController.text.trim(),
+        photoUrl: _photoUrl,
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -63,6 +90,59 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          Center(
+            child: Column(
+              children: [
+                Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 48,
+                      backgroundColor: AppColors.border,
+                      backgroundImage:
+                          _photoUrl == null ? null : NetworkImage(_photoUrl!),
+                      child: _photoUrl == null
+                          ? const Icon(Icons.person,
+                              size: 48, color: AppColors.textSecondary)
+                          : null,
+                    ),
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: AppColors.navy,
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          onPressed: _uploadingPhoto ? null : _pickProfilePhoto,
+                          icon: _uploadingPhoto
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(
+                                  Icons.camera_alt_outlined,
+                                  color: Colors.white,
+                                  size: 18,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                TextButton.icon(
+                  onPressed: _uploadingPhoto ? null : _pickProfilePhoto,
+                  icon: const Icon(Icons.photo_library_outlined),
+                  label: const Text('เปลี่ยนรูปโปรไฟล์'),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
           _label('ชื่อ-นามสกุล'),
           const SizedBox(height: 8),
           TextField(
@@ -91,7 +171,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           const SizedBox(height: 28),
           ElevatedButton(
-            onPressed: _saving ? null : _save,
+            onPressed: (_saving || _uploadingPhoto) ? null : _save,
             child: _saving
                 ? const SizedBox(
                     width: 20,

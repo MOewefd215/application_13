@@ -127,6 +127,19 @@ class AuthService {
     );
   }
 
+  Future<String?> getDisplayName(String uid) async {
+    final userSnapshot = await _db.collection('users').doc(uid).get();
+    final role = userSnapshot.data()?['u_role'] as String?;
+    if (role == null) return null;
+
+    final isEmployer = role == UserRole.employer;
+    final collection = isEmployer ? 'employers' : 'students';
+    final nameField = isEmployer ? 'emp_fullname' : 'std_fullname';
+    final profileSnapshot = await _db.collection(collection).doc(uid).get();
+    final name = profileSnapshot.data()?[nameField] as String?;
+    return name?.trim();
+  }
+
   /// Used by the profile edit screen — writes back to whichever
   /// role collection (`employers` or `students`) the signed-in user
   /// belongs to.
@@ -135,6 +148,7 @@ class AuthService {
     required String fullName,
     String? phone,
     String? universityOrAddress,
+    String? photoUrl,
   }) async {
     final uid = currentUser?.uid;
     if (uid == null) throw StateError('ยังไม่ได้เข้าสู่ระบบ');
@@ -148,6 +162,11 @@ class AuthService {
         'emp_address': universityOrAddress
       else
         'std_skill': universityOrAddress,
+      if (photoUrl != null)
+        if (isEmployer)
+          'emp_photo_url': photoUrl
+        else
+          'std_photo_url': photoUrl,
     }, SetOptions(merge: true));
   }
 

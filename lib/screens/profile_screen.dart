@@ -105,11 +105,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
               Stack(
                 alignment: Alignment.center,
                 children: [
-                  const CircleAvatar(
+                  CircleAvatar(
                     radius: 40,
                     backgroundColor: AppColors.border,
-                    child: Icon(Icons.person,
-                        size: 40, color: AppColors.textSecondary),
+                    backgroundImage: user.photoUrl == null
+                        ? null
+                        : NetworkImage(user.photoUrl!),
+                    child: user.photoUrl == null
+                        ? const Icon(Icons.person,
+                            size: 40, color: AppColors.textSecondary)
+                        : null,
                   ),
                   Positioned(
                     right: 100,
@@ -218,75 +223,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              const Text('รีวิวที่ได้รับ',
-                  style: TextStyle(fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              StreamBuilder<List<ReviewModel>>(
-                stream: ReviewService().reviewsForUser(user.uid),
-                builder: (context, snapshot) {
-                  final reviews = snapshot.data ?? const [];
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 16),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  if (reviews.isEmpty) {
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(AppRadius.card),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const EmptyState(
-                        icon: Icons.rate_review_outlined,
-                        message: 'ยังไม่มีรีวิว',
-                      ),
-                    );
-                  }
-                  return Column(
-                    children: reviews
-                        .map((r) => Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: AppColors.card,
-                                borderRadius:
-                                    BorderRadius.circular(AppRadius.card),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: List.generate(
-                                        5,
-                                        (i) => Icon(
-                                              i < r.rating
-                                                  ? Icons.star
-                                                  : Icons.star_border,
-                                              size: 16,
-                                              color: AppColors.star,
-                                            )),
-                                  ),
-                                  if (r.comment.isNotEmpty) ...[
-                                    const SizedBox(height: 6),
-                                    Text(r.comment),
+              if (!isEmployer) ...[
+                const SizedBox(height: 16),
+                const Text('รีวิวที่ได้รับ',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 8),
+                StreamBuilder<List<ReviewModel>>(
+                  stream: ReviewService().reviewsForUser(user.uid),
+                  builder: (context, snapshot) {
+                    final reviews = snapshot.data ?? const [];
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    if (reviews.isEmpty) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          color: AppColors.card,
+                          borderRadius: BorderRadius.circular(AppRadius.card),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const EmptyState(
+                          icon: Icons.rate_review_outlined,
+                          message: 'ยังไม่มีรีวิว',
+                        ),
+                      );
+                    }
+                    return Column(
+                      children: reviews
+                          .map((r) => Container(
+                                margin: const EdgeInsets.only(bottom: 10),
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: AppColors.card,
+                                  borderRadius:
+                                      BorderRadius.circular(AppRadius.card),
+                                  border: Border.all(color: AppColors.border),
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: List.generate(
+                                          5,
+                                          (i) => Icon(
+                                                i < r.rating
+                                                    ? Icons.star
+                                                    : Icons.star_border,
+                                                size: 16,
+                                                color: AppColors.star,
+                                              )),
+                                    ),
+                                    if (r.comment.isNotEmpty) ...[
+                                      const SizedBox(height: 6),
+                                      Text(r.comment),
+                                    ],
                                   ],
-                                ],
-                              ),
-                            ))
-                        .toList(),
-                  );
-                },
-              ),
-              const SizedBox(height: 16),
+                                ),
+                              ))
+                          .toList(),
+                    );
+                  },
+                ),
+                const SizedBox(height: 16),
+              ],
               if (!isEmployer)
                 _menuTile(context, Icons.verified_user_outlined, 'ยืนยันตัวตน',
                     VerificationOrWallet.verification, user.uid),
-              _menuTile(context, Icons.report_gmailerrorred_outlined,
-                  'ร้องเรียน / แจ้งปัญหา', VerificationOrWallet.report, user.uid),
+              _menuTile(
+                  context,
+                  Icons.report_gmailerrorred_outlined,
+                  'ร้องเรียน / แจ้งปัญหา',
+                  VerificationOrWallet.report,
+                  user.uid),
               const SizedBox(height: 8),
               ListTile(
                 contentPadding: EdgeInsets.zero,

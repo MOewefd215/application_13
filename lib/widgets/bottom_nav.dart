@@ -32,11 +32,14 @@ class StudentProBottomNav extends StatelessWidget {
         onTap: onTap,
         type: BottomNavigationBarType.fixed,
         backgroundColor: AppColors.card,
+        elevation: 8,
         selectedItemColor: AppColors.navy,
         unselectedItemColor: AppColors.textSecondary,
         showUnselectedLabels: true,
-        selectedLabelStyle: const TextStyle(fontSize: 11),
-        unselectedLabelStyle: const TextStyle(fontSize: 11),
+        selectedLabelStyle:
+            const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
+        unselectedLabelStyle:
+            const TextStyle(fontSize: 10, fontWeight: FontWeight.w700),
         items: [
           const BottomNavigationBarItem(
               icon: Icon(Icons.home_outlined),
@@ -51,8 +54,10 @@ class StudentProBottomNav extends StatelessWidget {
               activeIcon: Icon(Icons.chat_bubble),
               label: 'แชท'),
           BottomNavigationBarItem(
-            icon: _notificationIcon(snapshot.data ?? 0, Icons.notifications_none),
-            activeIcon: _notificationIcon(snapshot.data ?? 0, Icons.notifications),
+            icon:
+                _notificationIcon(snapshot.data ?? 0, Icons.notifications_none),
+            activeIcon:
+                _notificationIcon(snapshot.data ?? 0, Icons.notifications),
             label: 'แจ้งเตือน',
           ),
           const BottomNavigationBarItem(
@@ -77,7 +82,7 @@ class StudentProBottomNav extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
             padding: const EdgeInsets.symmetric(horizontal: 4),
             decoration: const BoxDecoration(
-              color: Colors.red,
+              color: AppColors.danger,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../services/notification_service.dart';
 import '../services/auth_service.dart';
+import '../services/job_service.dart';
+import 'job_detail_screen.dart';
 import '../widgets/bottom_nav.dart';
 import '../navigation/app_tab_navigation.dart';
 
@@ -14,6 +16,7 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   final _notificationService = NotificationService();
+  final _jobService = JobService();
   bool showUnreadOnly = false;
 
   @override
@@ -114,11 +117,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                                         style: const TextStyle(
                                             fontWeight: FontWeight.w600)),
                                     subtitle: Text(n.body),
-                                    onTap: () {
-                                      if (!n.read) {
-                                        _notificationService.markAsRead(n.id);
-                                      }
-                                    },
+                                    onTap: () => _openNotification(n),
                                   ),
                                 );
                               },
@@ -128,6 +127,37 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 );
               },
             ),
+    );
+  }
+
+  Future<void> _openNotification(NotificationModel notification) async {
+    if (!notification.read) {
+      await _notificationService.markAsRead(notification.id);
+    }
+    if (!mounted) return;
+
+    var jobId = notification.jobId;
+    if (jobId == null || jobId.isEmpty) {
+      final titleMatch = RegExp(r'"([^"]+)"').firstMatch(notification.body);
+      if (titleMatch != null) {
+        final job = await _jobService.getJobByTitle(titleMatch.group(1)!);
+        jobId = job?.jobId;
+      }
+    }
+
+    if (!mounted) return;
+    if (jobId == null || jobId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('ไม่พบงานที่เชื่อมกับการแจ้งเตือนนี้')),
+      );
+      return;
+    }
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => JobDetailScreen(jobId: jobId),
+      ),
     );
   }
 

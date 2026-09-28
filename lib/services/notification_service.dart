@@ -5,6 +5,7 @@ class NotificationModel {
   final String userId;
   final String title;
   final String body;
+  final String? jobId;
   final bool read;
   final DateTime? createdAt;
 
@@ -13,6 +14,7 @@ class NotificationModel {
     required this.userId,
     required this.title,
     required this.body,
+    this.jobId,
     this.read = false,
     this.createdAt,
   });
@@ -23,6 +25,7 @@ class NotificationModel {
       userId: map['user_id'] ?? '',
       title: map['title'] ?? '',
       body: map['body'] ?? '',
+      jobId: map['job_id'] as String?,
       read: map['read'] ?? false,
       createdAt: (map['created_at'] as Timestamp?)?.toDate(),
     );
@@ -44,11 +47,13 @@ class NotificationService {
     required String userId,
     required String title,
     required String body,
+    String? jobId,
   }) {
     return _col.add({
       'user_id': userId,
       'title': title,
       'body': body,
+      if (jobId != null) 'job_id': jobId,
       'read': false,
       'created_at': FieldValue.serverTimestamp(),
     });
@@ -64,8 +69,8 @@ class NotificationService {
       final items = snap.docs
           .map((d) => NotificationModel.fromMap(d.id, d.data()))
           .toList();
-      items.sort((a, b) => (b.createdAt ?? DateTime(0))
-          .compareTo(a.createdAt ?? DateTime(0)));
+      items.sort((a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
       return items;
     });
   }

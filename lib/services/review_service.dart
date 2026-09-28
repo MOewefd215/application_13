@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/review_model.dart';
 
 /// Backs "หน้ารีวิวผู้ใช้งาน" (3.3.12) — was previously a UI-only star
@@ -21,6 +22,18 @@ class ReviewService {
       throw ArgumentError('คะแนนต้องอยู่ระหว่าง 1-5');
     }
 
+    if (FirebaseAuth.instance.currentUser?.uid != reviewerId) {
+      throw StateError('กรุณาเข้าสู่ระบบด้วยบัญชีผู้จ้างงานก่อนรีวิว');
+    }
+
+    final jobSnapshot = await _db.collection('jobs').doc(jobId).get();
+    final job = jobSnapshot.data();
+    if (job == null ||
+        job['job_status'] != 'Done' ||
+        job['emp_id'] != reviewerId ||
+        job['std_id'] != revieweeId) {
+      throw StateError('ผู้จ้างงานรีวิวได้เฉพาะนักศึกษาที่ทำงานนี้เสร็จแล้ว');
+    }
     final review = ReviewModel(
       id: '',
       jobId: jobId,
@@ -47,11 +60,8 @@ class ReviewService {
 
     // เขียนกลับที่ students/{uid} — เผื่อ revieweeId ไม่ใช่นักศึกษา
     // (เช่นรีวิวผู้จ้างงาน) การ set แบบ merge จะไม่พังอะไร แค่ไม่มีผล
-    await _db
-        .collection('students')
-        .doc(revieweeId)
-        .set({'std_rating': average}, SetOptions(merge: true))
-        .catchError((_) {});
+    await _db.collection('students').doc(revieweeId).set(
+        {'std_rating': average}, SetOptions(merge: true)).catchError((_) {});
   }
 
   /// Reviews received by a user — for ProfileScreen / ReviewScreen list.
@@ -62,9 +72,8 @@ class ReviewService {
         .where('reviewee_id', isEqualTo: revieweeId)
         .snapshots()
         .map((snap) {
-      final reviews = snap.docs
-          .map((d) => ReviewModel.fromMap(d.id, d.data()))
-          .toList();
+      final reviews =
+          snap.docs.map((d) => ReviewModel.fromMap(d.id, d.data())).toList();
       reviews.sort((a, b) =>
           (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
       return reviews.take(limit).toList();

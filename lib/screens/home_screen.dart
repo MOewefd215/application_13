@@ -23,7 +23,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _loadingRole = true;
-  bool _isEmployer = false; // ตาม role 3.1.1 ผู้จ้างงาน / 3.1.2 นักศึกษา
+  bool _isEmployer = false;
+  String _currentUserName = 'ผู้ใช้งาน';
+  String? _profilePhotoUrl; // ตาม role 3.1.1 ผู้จ้างงาน / 3.1.2 นักศึกษา
   final _jobService = JobService();
   final _locationService = LocationService();
   final _searchController = TextEditingController();
@@ -50,13 +52,25 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRole() async {
-    final role = await AuthService().getUserRole();
+    final user = await AuthService().getCurrentAppUser();
     if (mounted) {
       setState(() {
-        _isEmployer = role == UserRole.employer;
+        _isEmployer = user?.role == UserRole.employer;
+        _currentUserName = (user?.fullName.trim().isNotEmpty ?? false)
+            ? user!.fullName.trim()
+            : 'ผู้ใช้งาน';
+        _profilePhotoUrl = user?.photoUrl;
         _loadingRole = false;
       });
     }
+  }
+
+  Future<void> _openProfile() async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const ProfileScreen()),
+    );
+    if (mounted) _loadRole();
   }
 
   Future<void> _loadMyLocation() async {
@@ -108,21 +122,44 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Row(
               children: [
-                const CircleAvatar(
-                  radius: 22,
-                  backgroundColor: AppColors.border,
-                  child: Icon(Icons.person, color: AppColors.textSecondary),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('สวัสดี', style: TextStyle(fontSize: 12)),
-                      Text('ผู้ใช้งาน',
-                          style: TextStyle(
-                              fontWeight: FontWeight.w700, fontSize: 16)),
-                    ],
+                Expanded(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(28),
+                    onTap: _openProfile,
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 22,
+                          backgroundColor: AppColors.border,
+                          backgroundImage: _profilePhotoUrl == null
+                              ? null
+                              : NetworkImage(_profilePhotoUrl!),
+                          child: _profilePhotoUrl == null
+                              ? const Icon(Icons.person,
+                                  color: AppColors.textSecondary)
+                              : null,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('สวัสดี',
+                                  style: TextStyle(fontSize: 12)),
+                              Text(
+                                _currentUserName,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 IconButton(
@@ -155,8 +192,18 @@ class _HomeScreenState extends State<HomeScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: AppColors.navy,
+                gradient: const LinearGradient(
+                  colors: [AppColors.navy, AppColors.blue],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(AppRadius.card),
+                boxShadow: [
+                  BoxShadow(
+                      color: AppColors.navy.withValues(alpha: 0.14),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8)),
+                ],
               ),
               child: const Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -202,8 +249,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                     : AppColors.border),
                           ),
                           child: Icon(c['icon'] as IconData,
-                              color:
-                                  selected ? Colors.white : AppColors.navy),
+                              color: selected ? Colors.white : AppColors.navy),
                         ),
                         const SizedBox(height: 6),
                         Text(label,
@@ -262,10 +308,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     child: EmptyState(
                       icon: Icons.work_outline,
-                      message: (_searchQuery.isNotEmpty ||
-                              _selectedCategory != null)
-                          ? 'ไม่พบงานที่ตรงกับตัวกรอง'
-                          : 'ยังไม่มีประกาศงานในขณะนี้',
+                      message:
+                          (_searchQuery.isNotEmpty || _selectedCategory != null)
+                              ? 'ไม่พบงานที่ตรงกับตัวกรอง'
+                              : 'ยังไม่มีประกาศงานในขณะนี้',
                     ),
                   );
                 }

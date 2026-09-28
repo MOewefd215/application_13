@@ -8,8 +8,10 @@ class AppUserModel {
   final String email;
   final String role; // UserRole.employer / UserRole.student
   final String fullName;
+  final String? photoUrl;
   final String? phone;
-  final String? universityOrAddress; // std_skill/university for student, emp_address for employer
+  final String?
+      universityOrAddress; // std_skill/university for student, emp_address for employer
   final double rating;
 
   const AppUserModel({
@@ -17,6 +19,7 @@ class AppUserModel {
     required this.email,
     required this.role,
     required this.fullName,
+    this.photoUrl,
     this.phone,
     this.universityOrAddress,
     this.rating = 0,
@@ -34,9 +37,10 @@ class AppUserModel {
       email: userMap['u_email'] ?? '',
       role: role,
       fullName: roleMap?[isEmployer ? 'emp_fullname' : 'std_fullname'] ?? '',
+      photoUrl:
+          roleMap?[isEmployer ? 'emp_photo_url' : 'std_photo_url'] as String?,
       phone: roleMap?[isEmployer ? 'emp_phone' : 'std_phone'],
-      universityOrAddress:
-          roleMap?[isEmployer ? 'emp_address' : 'std_skill'],
+      universityOrAddress: roleMap?[isEmployer ? 'emp_address' : 'std_skill'],
       rating: (roleMap?['std_rating'] as num?)?.toDouble() ?? 0,
     );
   }

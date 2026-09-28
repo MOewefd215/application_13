@@ -72,10 +72,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       await _jobService.applyToJob(jobId: widget.jobId!, stdId: uid);
       if (mounted) {
         setState(() {}); // รีเฟรช FutureBuilder ของ hasApplied
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(
-                content: Text(
-                    'สมัครรับงานสำเร็จ เช็คสถานะได้ที่ "งานของฉัน" → "คำขอที่ส่งไป"')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'สมัครรับงานสำเร็จ เช็คสถานะได้ที่ "งานของฉัน" → "คำขอที่ส่งไป"')));
       }
     } catch (e) {
       if (mounted) {
@@ -196,11 +195,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _circleIcon(Icons.arrow_back, () => Navigator.pop(context)),
+                      _circleIcon(
+                          Icons.arrow_back, () => Navigator.pop(context)),
                       Row(
                         children: [
-                          if (isEmployer &&
-                              job.jobStatus == JobStatus.open)
+                          if (isEmployer && job.jobStatus == JobStatus.open)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: _circleIcon(Icons.edit_outlined, () async {
@@ -294,6 +293,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   onPressed: () async {
                                     final otherUid =
                                         isEmployer ? job.stdId! : job.empId;
+                                    final chatPartnerName = await _authService
+                                        .getDisplayName(otherUid);
                                     final roomId = await _chatService.openRoom(
                                       uidA: uid,
                                       uidB: otherUid,
@@ -307,7 +308,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                           builder: (_) => ConversationScreen(
                                             roomId: roomId,
                                             otherUserId: otherUid,
-                                            title: job.jobTitle,
+                                            title:
+                                                (chatPartnerName?.isNotEmpty ??
+                                                        false)
+                                                    ? chatPartnerName!
+                                                    : job.jobTitle,
                                           ),
                                         ),
                                       );
@@ -348,8 +353,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                     color: AppColors.card,
                                     borderRadius:
                                         BorderRadius.circular(AppRadius.card),
-                                    border:
-                                        Border.all(color: AppColors.border),
+                                    border: Border.all(color: AppColors.border),
                                   ),
                                   child: const EmptyState(
                                     icon: Icons.people_outline,
@@ -379,12 +383,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                           children: [
                                             const CircleAvatar(
                                               radius: 18,
-                                              backgroundColor:
-                                                  AppColors.border,
+                                              backgroundColor: AppColors.border,
                                               child: Icon(Icons.person,
                                                   size: 18,
-                                                  color: AppColors
-                                                      .textSecondary),
+                                                  color:
+                                                      AppColors.textSecondary),
                                             ),
                                             const SizedBox(width: 10),
                                             Expanded(
@@ -499,8 +502,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
 
     // งานเสร็จแล้ว → ให้รีวิวอีกฝ่าย
-    if (job.jobStatus == JobStatus.done && uid != null) {
-      final revieweeId = isEmployer ? job.stdId : job.empId;
+    if (job.jobStatus == JobStatus.done &&
+        currentRole == UserRole.employer &&
+        isEmployer &&
+        uid != null) {
+      final revieweeId = job.stdId;
       if (revieweeId != null) {
         return ElevatedButton(
           onPressed: () => Navigator.push(

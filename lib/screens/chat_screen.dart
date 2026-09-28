@@ -50,35 +50,47 @@ class ChatScreen extends StatelessWidget {
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (context, index) {
                     final room = rooms[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.card,
-                        borderRadius: BorderRadius.circular(AppRadius.card),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: ListTile(
-                        leading: const CircleAvatar(
-                          backgroundColor: AppColors.border,
-                          child: Icon(Icons.person,
-                              color: AppColors.textSecondary),
-                        ),
-                        title: Text(room.jobTitle ?? 'บทสนทนา'),
-                        subtitle: Text(
-                          room.lastMessage ?? 'ยังไม่มีข้อความ',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => ConversationScreen(
-                              roomId: room.id,
-                              otherUserId: room.otherParticipant(uid),
-                              title: room.jobTitle ?? 'บทสนทนา',
+                    final otherUserId = room.otherParticipant(uid);
+                    return FutureBuilder<String?>(
+                      future: otherUserId.isEmpty
+                          ? Future<String?>.value(null)
+                          : AuthService().getDisplayName(otherUserId),
+                      builder: (context, nameSnapshot) {
+                        final otherName = nameSnapshot.data;
+                        final chatTitle = (otherName?.isNotEmpty ?? false)
+                            ? otherName!
+                            : room.jobTitle ?? 'บทสนทนา';
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: AppColors.card,
+                            borderRadius: BorderRadius.circular(AppRadius.card),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: ListTile(
+                            leading: const CircleAvatar(
+                              backgroundColor: AppColors.border,
+                              child: Icon(Icons.person,
+                                  color: AppColors.textSecondary),
+                            ),
+                            title: Text(chatTitle),
+                            subtitle: Text(
+                              room.lastMessage ?? 'ยังไม่มีข้อความ',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => ConversationScreen(
+                                  roomId: room.id,
+                                  otherUserId: room.otherParticipant(uid),
+                                  title: chatTitle,
+                                ),
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     );
                   },
                 );
@@ -184,7 +196,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
       if (!await _audioRecorder.hasPermission()) {
         throw StateError('Microphone permission was denied.');
       }
-      final path = '${Directory.systemTemp.path}${Platform.pathSeparator}chat_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
+      final path =
+          '${Directory.systemTemp.path}${Platform.pathSeparator}chat_voice_${DateTime.now().microsecondsSinceEpoch}.m4a';
       await _audioRecorder.start(
         const RecordConfig(encoder: AudioEncoder.aacLc),
         path: path,
@@ -204,8 +217,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Could not start recording: $error')),
+          SnackBar(content: Text('Could not start recording: $error')),
         );
       }
     }
@@ -238,9 +250,7 @@ class _ConversationScreenState extends State<ConversationScreen> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('Could not send voice message: $error')),
+          SnackBar(content: Text('Could not send voice message: $error')),
         );
       }
     } finally {
@@ -385,7 +395,8 @@ class _ConversationScreenState extends State<ConversationScreen> {
                   const Icon(Icons.fiber_manual_record,
                       color: Colors.red, size: 14),
                   const SizedBox(width: 8),
-                  Text('Recording ${_formatAudioDuration(_recordingElapsed.inMilliseconds)}'),
+                  Text(
+                      'Recording ${_formatAudioDuration(_recordingElapsed.inMilliseconds)}'),
                   const Spacer(),
                   const Text('Tap stop to send'),
                 ],
@@ -496,9 +507,7 @@ class _VoiceMessageBubbleState extends State<_VoiceMessageBubble> {
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content:
-                  Text('Could not play voice message: $error')),
+          SnackBar(content: Text('Could not play voice message: $error')),
         );
       }
     } finally {

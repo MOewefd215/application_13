@@ -97,8 +97,8 @@ class JobService {
         .map((snap) {
       final jobs =
           snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList();
-      jobs.sort((a, b) => (b.createdAt ?? DateTime(0))
-          .compareTo(a.createdAt ?? DateTime(0)));
+      jobs.sort((a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
       return jobs.take(limit).toList();
     });
   }
@@ -109,8 +109,8 @@ class JobService {
     return _jobs.where('emp_id', isEqualTo: empId).snapshots().map((snap) {
       final jobs =
           snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList();
-      jobs.sort((a, b) => (b.createdAt ?? DateTime(0))
-          .compareTo(a.createdAt ?? DateTime(0)));
+      jobs.sort((a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
       return jobs;
     });
   }
@@ -120,8 +120,8 @@ class JobService {
     return _jobs.where('std_id', isEqualTo: stdId).snapshots().map((snap) {
       final jobs =
           snap.docs.map((d) => JobModel.fromMap(d.id, d.data())).toList();
-      jobs.sort((a, b) => (b.createdAt ?? DateTime(0))
-          .compareTo(a.createdAt ?? DateTime(0)));
+      jobs.sort((a, b) =>
+          (b.createdAt ?? DateTime(0)).compareTo(a.createdAt ?? DateTime(0)));
       return jobs;
     });
   }
@@ -133,7 +133,8 @@ class JobService {
   /// students can apply, employer picks one later via
   /// [selectApplicant]. Replaces the old first-come-first-served
   /// `acceptJob`.
-  Future<void> applyToJob({required String jobId, required String stdId}) async {
+  Future<void> applyToJob(
+      {required String jobId, required String stdId}) async {
     final signedInUser = _auth.currentUser;
     if (signedInUser == null || signedInUser.uid != stdId) {
       throw StateError('กรุณาเข้าสู่ระบบก่อนสมัครงาน');
@@ -162,10 +163,12 @@ class JobService {
       userId: job.empId,
       title: 'มีผู้สมัครงานใหม่',
       body: 'งาน "${job.jobTitle}" มีนักศึกษาสมัครรับงานเพิ่ม',
+      jobId: jobId,
     );
   }
 
-  Future<bool> hasApplied({required String jobId, required String stdId}) async {
+  Future<bool> hasApplied(
+      {required String jobId, required String stdId}) async {
     final snap = await _applications
         .where('job_id', isEqualTo: jobId)
         .where('student_id', isEqualTo: stdId)
@@ -183,8 +186,8 @@ class JobService {
       final apps = snap.docs
           .map((d) => JobApplicationModel.fromMap(d.id, d.data()))
           .toList();
-      apps.sort((a, b) => (a.appliedAt ?? DateTime(0))
-          .compareTo(b.appliedAt ?? DateTime(0)));
+      apps.sort((a, b) =>
+          (a.appliedAt ?? DateTime(0)).compareTo(b.appliedAt ?? DateTime(0)));
       return apps;
     });
   }
@@ -200,8 +203,8 @@ class JobService {
       final apps = snap.docs
           .map((d) => JobApplicationModel.fromMap(d.id, d.data()))
           .toList();
-      apps.sort((a, b) => (b.appliedAt ?? DateTime(0))
-          .compareTo(a.appliedAt ?? DateTime(0)));
+      apps.sort((a, b) =>
+          (b.appliedAt ?? DateTime(0)).compareTo(a.appliedAt ?? DateTime(0)));
       return apps;
     });
   }
@@ -238,16 +241,14 @@ class JobService {
       'job_status': JobStatus.process,
     });
 
-    final applicants = await _applications
-        .where('job_id', isEqualTo: jobId)
-        .get();
+    final applicants =
+        await _applications.where('job_id', isEqualTo: jobId).get();
     final batch = _db.batch();
     for (final doc in applicants.docs) {
       final isChosen = doc.data()['student_id'] == stdId;
       batch.update(doc.reference, {
-        'status': isChosen
-            ? ApplicationStatus.accepted
-            : ApplicationStatus.rejected,
+        'status':
+            isChosen ? ApplicationStatus.accepted : ApplicationStatus.rejected,
       });
     }
     await batch.commit();
@@ -256,6 +257,7 @@ class JobService {
       userId: stdId,
       title: 'คุณได้รับเลือกให้ทำงานนี้',
       body: 'งาน "${job.jobTitle}" เลือกคุณเป็นผู้รับงานแล้ว',
+      jobId: jobId,
     );
   }
 
@@ -270,6 +272,7 @@ class JobService {
         userId: job.stdId!,
         title: 'งานเสร็จสิ้นแล้ว',
         body: 'งาน "${job.jobTitle}" ถูกยืนยันว่าเสร็จสิ้นแล้ว',
+        jobId: jobId,
       );
     }
   }
@@ -284,8 +287,17 @@ class JobService {
         userId: job.stdId!,
         title: 'งานถูกยกเลิก',
         body: 'งาน "${job.jobTitle}" ถูกยกเลิกแล้ว',
+        jobId: jobId,
       );
     }
+  }
+
+  Future<JobModel?> getJobByTitle(String title) async {
+    final matches =
+        await _jobs.where('job_title', isEqualTo: title).limit(1).get();
+    if (matches.docs.isEmpty) return null;
+    final doc = matches.docs.first;
+    return JobModel.fromMap(doc.id, doc.data());
   }
 
   Future<JobModel?> getJob(String jobId) async {
