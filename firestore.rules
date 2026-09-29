@@ -69,21 +69,27 @@ service cloud.firestore {
           && request.resource.data.u_email == resource.data.u_email
           && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['u_phone', 'u_address', 'u_gender', 'u_age', 'u_verification', 'u_phone_verified', 'u_email_verified'])
-          && request.resource.data.u_phone is string
-          && request.resource.data.u_phone.size() >= 9
-          && request.resource.data.u_phone.size() <= 16
-          && request.resource.data.u_address is string
-          && request.resource.data.u_address.size() >= 5
-          && request.resource.data.u_address.size() <= 250
-          && request.resource.data.u_gender in
-              ['male', 'female', 'other', 'prefer_not_to_say']
-          && request.resource.data.u_age is int
-          && request.resource.data.u_age >= 13
-          && request.resource.data.u_age <= 100
-          && (!('u_email_verified' in request.resource.data)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['u_phone'])
+              || (request.resource.data.u_phone is string
+                  && request.resource.data.u_phone.size() >= 9
+                  && request.resource.data.u_phone.size() <= 16))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['u_address'])
+              || (request.resource.data.u_address is string
+                  && request.resource.data.u_address.size() >= 5
+                  && request.resource.data.u_address.size() <= 250))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['u_gender'])
+              || request.resource.data.u_gender in
+                  ['male', 'female', 'other', 'prefer_not_to_say'])
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['u_age'])
+              || (request.resource.data.u_age is int
+                  && request.resource.data.u_age >= 13
+                  && request.resource.data.u_age <= 100))
+          && (!request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['u_email_verified'])
               || (request.resource.data.u_email_verified == true
                   && request.auth.token.email_verified == true))
-          && (!('u_phone_verified' in request.resource.data)
+          && (!request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['u_phone_verified'])
               || (request.resource.data.u_phone_verified == true
                   && request.auth.token.phone_number == request.resource.data.u_phone))
           && (!request.resource.data.diff(resource.data).affectedKeys()

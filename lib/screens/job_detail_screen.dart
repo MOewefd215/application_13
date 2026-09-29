@@ -9,6 +9,7 @@ import 'job_map_screen.dart';
 import 'review_screen.dart';
 import 'chat_screen.dart';
 import 'post_job_screen.dart';
+import 'applicant_profile_screen.dart';
 
 class JobDetailScreen extends StatefulWidget {
   /// [jobId] is optional so this screen still opens standalone (e.g.
@@ -64,10 +65,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       await _jobService.applyToJob(jobId: widget.jobId!, stdId: uid);
       if (mounted) {
         setState(() {}); // รีเฟรช FutureBuilder ของ hasApplied
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(
-                content: Text(
-                    'สมัครรับงานสำเร็จ เช็คสถานะได้ที่ "งานของฉัน" → "คำขอที่ส่งไป"')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'สมัครรับงานสำเร็จ เช็คสถานะได้ที่ "งานของฉัน" → "คำขอที่ส่งไป"')));
       }
     } catch (e) {
       if (mounted) {
@@ -188,11 +188,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _circleIcon(Icons.arrow_back, () => Navigator.pop(context)),
+                      _circleIcon(
+                          Icons.arrow_back, () => Navigator.pop(context)),
                       Row(
                         children: [
-                          if (isEmployer &&
-                              job.jobStatus == JobStatus.open)
+                          if (isEmployer && job.jobStatus == JobStatus.open)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: _circleIcon(Icons.edit_outlined, () async {
@@ -323,8 +323,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                           style:
                               const TextStyle(color: AppColors.textSecondary),
                         ),
-                        if (isEmployer &&
-                            job.jobStatus == JobStatus.open) ...[
+                        if (isEmployer && job.jobStatus == JobStatus.open) ...[
                           const SizedBox(height: 20),
                           const Text('ผู้สมัครรับงาน',
                               style: TextStyle(fontWeight: FontWeight.w700)),
@@ -339,8 +338,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                     color: AppColors.card,
                                     borderRadius:
                                         BorderRadius.circular(AppRadius.card),
-                                    border:
-                                        Border.all(color: AppColors.border),
+                                    border: Border.all(color: AppColors.border),
                                   ),
                                   child: const EmptyState(
                                     icon: Icons.people_outline,
@@ -370,21 +368,43 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                           children: [
                                             const CircleAvatar(
                                               radius: 18,
-                                              backgroundColor:
-                                                  AppColors.border,
+                                              backgroundColor: AppColors.border,
                                               child: Icon(Icons.person,
                                                   size: 18,
-                                                  color: AppColors
-                                                      .textSecondary),
+                                                  color:
+                                                      AppColors.textSecondary),
                                             ),
                                             const SizedBox(width: 10),
                                             Expanded(
-                                              child: Text(
-                                                  nameSnap.data ??
-                                                      'กำลังโหลด...',
-                                                  style: const TextStyle(
-                                                      fontWeight:
-                                                          FontWeight.w600)),
+                                              child: InkWell(
+                                                onTap: () => Navigator.push(
+                                                  context,
+                                                  MaterialPageRoute(
+                                                    builder: (_) =>
+                                                        ApplicantProfileScreen(
+                                                            application: app),
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                    nameSnap.data ??
+                                                        'กำลังโหลด...',
+                                                    style: const TextStyle(
+                                                        fontWeight:
+                                                            FontWeight.w600)),
+                                              ),
+                                            ),
+                                            IconButton(
+                                              tooltip: 'ดูโปรไฟล์ผู้สมัคร',
+                                              onPressed: () => Navigator.push(
+                                                context,
+                                                MaterialPageRoute(
+                                                  builder: (_) =>
+                                                      ApplicantProfileScreen(
+                                                          application: app),
+                                                ),
+                                              ),
+                                              icon: const Icon(Icons
+                                                  .account_circle_outlined),
                                             ),
                                             ElevatedButton(
                                               style: ElevatedButton.styleFrom(
@@ -472,9 +492,9 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       );
     }
 
-    // งานเสร็จแล้ว → ให้รีวิวอีกฝ่าย
-    if (job.jobStatus == JobStatus.done && uid != null) {
-      final revieweeId = isEmployer ? job.stdId : job.empId;
+    // Only the employer may review the student after the job is complete.
+    if (isEmployer && job.jobStatus == JobStatus.done && uid != null) {
+      final revieweeId = job.stdId;
       if (revieweeId != null) {
         return ElevatedButton(
           onPressed: () => Navigator.push(

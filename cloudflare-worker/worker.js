@@ -27,6 +27,54 @@ function pemBytes(pem) {
   return Uint8Array.from(atob(body), (char) => char.charCodeAt(0));
 }
 
+// Google's secure-token endpoint returns X.509 certificates. WebCrypto's
+// importKey('spki') expects the SubjectPublicKeyInfo section, not the whole
+// certificate, so extract that DER element before importing the key.
+function readDerElement(bytes, offset) {
+  if (offset + 2 > bytes.length) throw new Error('Invalid certificate');
+  const tag = bytes[offset];
+  let length = bytes[offset + 1];
+  let contentOffset = offset + 2;
+  if (length & 0x80) {
+    const lengthBytes = length & 0x7f;
+    if (lengthBytes === 0 || lengthBytes > 4 ||
+        contentOffset + lengthBytes > bytes.length) {
+      throw new Error('Invalid certificate length');
+    }
+    length = 0;
+    for (let index = 0; index < lengthBytes; index += 1) {
+      length = length * 256 + bytes[contentOffset + index];
+    }
+    contentOffset += lengthBytes;
+  }
+  const end = contentOffset + length;
+  if (end > bytes.length) throw new Error('Truncated certificate');
+  return { tag, start: offset, contentOffset, end };
+}
+
+function certificateSpki(certificatePem) {
+  const bytes = pemBytes(certificatePem);
+  const certificate = readDerElement(bytes, 0);
+  if (certificate.tag !== 0x30) throw new Error('Invalid X.509 certificate');
+  const tbs = readDerElement(bytes, certificate.contentOffset);
+  if (tbs.tag !== 0x30) throw new Error('Invalid X.509 certificate body');
+
+  let offset = tbs.contentOffset;
+  let field = readDerElement(bytes, offset);
+  if (field.tag === 0xa0) {
+    offset = field.end; // Optional explicit version.
+  }
+
+  // serialNumber, signature, issuer, validity, and subject precede SPKI.
+  for (let index = 0; index < 5; index += 1) {
+    field = readDerElement(bytes, offset);
+    offset = field.end;
+  }
+  const spki = readDerElement(bytes, offset);
+  if (spki.tag !== 0x30) throw new Error('Certificate has no public key');
+  return bytes.subarray(spki.start, spki.end);
+}
+
 async function googleAccessToken(account) {
   const now = Math.floor(Date.now() / 1000);
   const header = base64Url(utf8.encode(JSON.stringify({ alg: 'RS256', typ: 'JWT' })));
@@ -63,22 +111,27 @@ async function verifyFirebaseIdToken(idToken, projectId) {
   if (!headerPart || !payloadPart || !signaturePart) throw new Error('Invalid login token');
   const header = JSON.parse(new TextDecoder().decode(decodeBase64Url(headerPart)));
   const payload = JSON.parse(new TextDecoder().decode(decodeBase64Url(payloadPart)));
+  if (header.alg !== 'RS256' || typeof header.kid !== 'string') {
+    throw new Error('Unsupported login token signature');
+  }
   const certificates = await (await fetch(
     'https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com',
   )).json();
   const certificate = certificates[header.kid];
   if (!certificate) throw new Error('Unknown login token key');
   const key = await crypto.subtle.importKey(
-    'spki', pemBytes(certificate),
+    'spki', certificateSpki(certificate),
     { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify'],
   );
   const valid = await crypto.subtle.verify(
     { name: 'RSASSA-PKCS1-v1_5' }, key, decodeBase64Url(signaturePart),
     utf8.encode(`${headerPart}.${payloadPart}`),
   );
+  const now = Math.floor(Date.now() / 1000);
   if (!valid || payload.aud !== projectId ||
       payload.iss !== `https://securetoken.google.com/${projectId}` ||
-      payload.exp <= Math.floor(Date.now() / 1000) || !payload.sub) {
+      payload.exp <= now || payload.iat > now + 60 ||
+      typeof payload.sub !== 'string' || !payload.sub) {
     throw new Error('Login token is not valid');
   }
   return payload.sub;

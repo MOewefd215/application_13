@@ -225,13 +225,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       user.address?.isNotEmpty == true ? user.address! : '-'),
                   _infoRow('เพศ', _genderLabel(user.gender)),
                   _infoRow('อายุ', user.age == null ? '-' : '${user.age} ปี'),
-                  if (!isEmployer)
+                  if (!isEmployer) ...[
                     _infoRow(
-                      'มหาวิทยาลัย / ทักษะ',
+                      '\u0e21\u0e2b\u0e32\u0e27\u0e34\u0e17\u0e22\u0e32\u0e25\u0e31\u0e22',
+                      user.university?.isNotEmpty == true
+                          ? user.university!
+                          : '-',
+                    ),
+                    _infoRow(
+                      '\u0e04\u0e13\u0e30',
+                      user.faculty?.isNotEmpty == true ? user.faculty! : '-',
+                    ),
+                    _infoRow(
+                      '\u0e0a\u0e31\u0e49\u0e19\u0e1b\u0e35',
+                      user.year?.isNotEmpty == true ? user.year! : '-',
+                    ),
+                    _infoRow(
+                      '\u0e17\u0e31\u0e01\u0e29\u0e30',
                       user.universityOrAddress?.isNotEmpty == true
                           ? user.universityOrAddress!
                           : '-',
                     ),
+                  ],
                 ],
               ),
               if (!isEmployer) ...[

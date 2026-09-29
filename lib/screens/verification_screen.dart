@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart' as firebase_core;
 import 'package:flutter/material.dart';
 
 import '../services/upload_service.dart';
@@ -28,6 +29,34 @@ class _VerificationScreenState extends State<VerificationScreen> {
   bool _isStudent = false;
   String? _error;
   String? _verificationId;
+
+  String _authErrorMessage(Object error, {required String action}) {
+    if (error is FirebaseAuthException) {
+      switch (error.code) {
+        case 'operation-not-allowed':
+          return 'ยังไม่ได้เปิดการยืนยันวิธีนี้ใน Firebase Console กรุณาตรวจสอบ Authentication > Sign-in method';
+        case 'too-many-requests':
+          return 'ส่งคำขอหลายครั้งเกินไป กรุณารอสักครู่แล้วลองใหม่';
+        case 'quota-exceeded':
+          return 'ส่งรหัสยืนยันเกินโควตาที่กำหนด กรุณาลองใหม่ภายหลัง';
+        case 'invalid-phone-number':
+          return 'รูปแบบเบอร์โทรไม่ถูกต้อง กรุณากรอกพร้อมรหัสประเทศ เช่น +66812345678';
+        case 'invalid-verification-code':
+          return 'รหัส OTP ไม่ถูกต้อง กรุณาตรวจสอบแล้วลองอีกครั้ง';
+        case 'session-expired':
+          return 'รหัส OTP หมดอายุแล้ว กรุณาขอรหัสใหม่';
+        case 'network-request-failed':
+          return 'เชื่อมต่ออินเทอร์เน็ตไม่ได้ กรุณาตรวจสอบเครือข่ายแล้วลองใหม่';
+        default:
+          return '$actionไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+      }
+    }
+    if (error is firebase_core.FirebaseException &&
+        error.code == 'permission-denied') {
+      return '$actionไม่สำเร็จ: Firestore Rules ยังไม่อนุญาต กรุณา Publish rules เวอร์ชันล่าสุดใน Firebase Console';
+    }
+    return '$actionไม่สำเร็จ กรุณาลองใหม่อีกครั้ง';
+  }
 
   String? get _uid => widget.userId ?? _auth.currentUser?.uid;
 
@@ -93,7 +122,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
       }, SetOptions(merge: true));
       await _loadStatus();
     } catch (error) {
-      if (mounted) setState(() => _error = 'อัปโหลดไม่สำเร็จ: $error');
+      if (mounted) {
+        setState(() => _error = _authErrorMessage(
+              error,
+              action: 'อัปโหลดบัตรนักศึกษาและบันทึกสถานะ',
+            ));
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -114,7 +148,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
         );
       }
     } catch (error) {
-      if (mounted) setState(() => _error = 'ส่งอีเมลไม่สำเร็จ: $error');
+      if (mounted) {
+        setState(() => _error = _authErrorMessage(
+              error,
+              action: 'ส่งอีเมลยืนยัน',
+            ));
+      }
     } finally {
       if (mounted) setState(() => _emailBusy = false);
     }
@@ -197,7 +236,12 @@ class _VerificationScreenState extends State<VerificationScreen> {
       }, SetOptions(merge: true));
       await _loadStatus();
     } catch (error) {
-      if (mounted) setState(() => _error = 'ยืนยันเบอร์ไม่สำเร็จ: $error');
+      if (mounted) {
+        setState(() => _error = _authErrorMessage(
+              error,
+              action: 'ยืนยันเบอร์โทร',
+            ));
+      }
     } finally {
       if (mounted) setState(() => _phoneBusy = false);
     }

@@ -20,19 +20,6 @@ class _NotificationScreenState extends State<NotificationScreen> {
   bool showUnreadOnly = false;
 
   @override
-  void initState() {
-    super.initState();
-    _markNotificationsAsRead();
-  }
-
-  Future<void> _markNotificationsAsRead() async {
-    final uid = AuthService().currentUser?.uid;
-    if (uid != null) {
-      await _notificationService.markAllAsReadForUser(uid);
-    }
-  }
-
-  @override
   Widget build(BuildContext context) {
     final uid = AuthService().currentUser?.uid;
 
