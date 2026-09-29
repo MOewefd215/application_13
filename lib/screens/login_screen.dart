@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
+import '../utils/profile_validators.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -21,6 +22,10 @@ class _LoginScreenState extends State<LoginScreen> {
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _addressController = TextEditingController();
+  final _ageController = TextEditingController();
+  String? _selectedGender;
   String? _selectedRole; // UserRole.employer or UserRole.student
 
   @override
@@ -28,6 +33,9 @@ class _LoginScreenState extends State<LoginScreen> {
     _fullNameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _phoneController.dispose();
+    _addressController.dispose();
+    _ageController.dispose();
     super.dispose();
   }
 
@@ -37,24 +45,34 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
-    final email = _emailController.text.trim();
+    final email = _emailController.text.trim().toLowerCase();
     final password = _passwordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
-      _showError('กรุณากรอกอีเมลและรหัสผ่าน');
+    String? validationError;
+    if (isLoginTab) {
+      validationError = ProfileValidators.validateEmail(email);
+      if (validationError == null && password.isEmpty) {
+        validationError = 'กรุณากรอกรหัสผ่าน';
+      }
+    } else {
+      validationError =
+          ProfileValidators.validateName(_fullNameController.text) ??
+              ProfileValidators.validateEmail(email) ??
+              ProfileValidators.validatePhone(_phoneController.text) ??
+              ProfileValidators.validateAddress(_addressController.text) ??
+              ProfileValidators.validateGender(_selectedGender) ??
+              ProfileValidators.validateAge(_ageController.text);
+      if (validationError == null && password.length < 6) {
+        validationError = 'รหัสผ่านต้องมีอย่างน้อย 6 ตัวอักษร';
+      }
+      if (validationError == null && _selectedRole == null) {
+        validationError = 'กรุณาเลือกประเภทผู้ใช้งาน';
+      }
+    }
+    if (validationError != null) {
+      _showError(validationError);
       return;
     }
-    if (!isLoginTab) {
-      if (_fullNameController.text.trim().isEmpty) {
-        _showError('กรุณากรอกชื่อ-นามสกุล');
-        return;
-      }
-      if (_selectedRole == null) {
-        _showError('กรุณาเลือกประเภทผู้ใช้งาน');
-        return;
-      }
-    }
-
     setState(() => loading = true);
     try {
       if (isLoginTab) {
@@ -65,6 +83,10 @@ class _LoginScreenState extends State<LoginScreen> {
           email: email,
           password: password,
           role: _selectedRole!,
+          phone: ProfileValidators.normalizePhone(_phoneController.text),
+          address: _addressController.text.trim(),
+          gender: _selectedGender!,
+          age: ProfileValidators.parseAge(_ageController.text)!,
         );
       }
       if (mounted) {
@@ -158,6 +180,49 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
+                _label('เบอร์โทรศัพท์'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  decoration:
+                      const InputDecoration(hintText: 'กรอกเบอร์โทรศัพท์'),
+                ),
+                const SizedBox(height: 16),
+                _label('ที่อยู่'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _addressController,
+                  maxLines: 2,
+                  decoration: const InputDecoration(hintText: 'กรอกที่อยู่'),
+                ),
+                const SizedBox(height: 16),
+                _label('เพศ'),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedGender,
+                  decoration: const InputDecoration(hintText: 'เลือกเพศ'),
+                  items: const [
+                    DropdownMenuItem(value: 'male', child: Text('ชาย')),
+                    DropdownMenuItem(value: 'female', child: Text('หญิง')),
+                    DropdownMenuItem(value: 'other', child: Text('อื่น ๆ')),
+                    DropdownMenuItem(
+                      value: 'prefer_not_to_say',
+                      child: Text('ไม่ประสงค์ระบุ'),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() => _selectedGender = value),
+                ),
+                const SizedBox(height: 16),
+                _label('อายุ'),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _ageController,
+                  keyboardType: TextInputType.number,
+                  decoration:
+                      const InputDecoration(hintText: 'อายุ (13–100 ปี)'),
+                ),
+                const SizedBox(height: 16),
               ],
 
               _label('อีเมล'),
@@ -236,8 +301,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       size: 16, color: AppColors.success),
                   SizedBox(width: 6),
                   Text('ปลอดภัย ยืนยันได้งานแน่นอน',
-                      style:
-                          TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary)),
                 ],
               ),
               const SizedBox(height: 24),
@@ -257,7 +322,8 @@ class _LoginScreenState extends State<LoginScreen> {
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('กรอกอีเมลที่ใช้สมัคร ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้'),
+            const Text(
+                'กรอกอีเมลที่ใช้สมัคร ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้'),
             const SizedBox(height: 12),
             TextField(
               controller: controller,
@@ -340,8 +406,8 @@ class _LoginScreenState extends State<LoginScreen> {
         decoration: BoxDecoration(
           color: selected ? AppColors.navy : AppColors.card,
           borderRadius: BorderRadius.circular(AppRadius.button),
-          border: Border.all(
-              color: selected ? AppColors.navy : AppColors.border),
+          border:
+              Border.all(color: selected ? AppColors.navy : AppColors.border),
           boxShadow: selected ? AppShadows.card : null,
         ),
         child: Column(

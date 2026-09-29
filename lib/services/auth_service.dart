@@ -3,17 +3,14 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../models/user_role.dart';
 import '../models/app_user_model.dart';
+import '../utils/profile_validators.dart';
 
 /// Real auth, replacing the placeholder "เข้าสู่ระบบ" button that used
 /// to just navigate to Home without checking anything.
 ///
-/// On sign-up this also writes:
-///   users/{uid}      — u_email, u_role, u_created_at   (ตารางที่ 3.1)
-///   employers/{uid}  — emp_fullname                    (ตารางที่ 3.2)
-///   students/{uid}   — std_fullname                    (ตารางที่ 3.3)
-/// depending on the role picked on the register form, so the rest of
-/// the app (JobDetail, Verification, Profile, etc.) has real rows to
-/// read/write against instead of the 'demo_user' placeholder id.
+/// On sign-up, shared identity/contact fields live under users/{uid}.
+/// The employers/{uid} or students/{uid} document stores role-specific
+/// public profile data. All three documents use the Firebase UID.
 class AuthService {
   final FirebaseAuth _auth;
   final FirebaseFirestore _db;
@@ -29,29 +26,56 @@ class AuthService {
     required String fullName,
     required String email,
     required String password,
-    required String role, // UserRole.employer or UserRole.student
+    required String role,
+    required String phone,
+    required String address,
+    required String gender,
+    required int age,
   }) async {
+    final validationError = ProfileValidators.validateName(fullName) ??
+        ProfileValidators.validateEmail(email) ??
+        ProfileValidators.validatePhone(phone) ??
+        ProfileValidators.validateAddress(address) ??
+        ProfileValidators.validateGender(gender) ??
+        ProfileValidators.validateAge(age.toString());
+    if (validationError != null) throw ArgumentError(validationError);
+
+    if (role != UserRole.employer && role != UserRole.student) {
+      throw ArgumentError('ประเภทผู้ใช้งานไม่ถูกต้อง');
+    }
+
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedPhone = ProfileValidators.normalizePhone(phone);
     final credential = await _auth.createUserWithEmailAndPassword(
-      email: email,
+      email: normalizedEmail,
       password: password,
     );
     final uid = credential.user!.uid;
 
+    final profile = AppUserModel(
+      uid: uid,
+      email: normalizedEmail,
+      role: role,
+      fullName: fullName.trim(),
+      phone: normalizedPhone,
+      address: address.trim(),
+      gender: gender,
+      age: age,
+    );
     await _db.collection('users').doc(uid).set({
-      'u_email': email,
-      'u_role': role,
+      ...profile.toUserMap(),
       'u_created_at': FieldValue.serverTimestamp(),
     });
 
     if (role == UserRole.employer) {
       await _db.collection('employers').doc(uid).set({
         'emp_id': uid,
-        'emp_fullname': fullName,
+        'emp_fullname': fullName.trim(),
       });
     } else {
       await _db.collection('students').doc(uid).set({
         'std_id': uid,
-        'std_fullname': fullName,
+        'std_fullname': fullName.trim(),
       });
     }
 
@@ -128,16 +152,17 @@ class AuthService {
   }
 
   Future<String?> getDisplayName(String uid) async {
-    final userSnapshot = await _db.collection('users').doc(uid).get();
-    final role = userSnapshot.data()?['u_role'] as String?;
-    if (role == null) return null;
+    // Public role docs contain display names; common contact details stay
+    // private in users/{uid}, which is readable only by its owner.
+    final employer = await _db.collection('employers').doc(uid).get();
+    final employerName = employer.data()?['emp_fullname'] as String?;
+    if (employerName != null && employerName.trim().isNotEmpty) {
+      return employerName.trim();
+    }
 
-    final isEmployer = role == UserRole.employer;
-    final collection = isEmployer ? 'employers' : 'students';
-    final nameField = isEmployer ? 'emp_fullname' : 'std_fullname';
-    final profileSnapshot = await _db.collection(collection).doc(uid).get();
-    final name = profileSnapshot.data()?[nameField] as String?;
-    return name?.trim();
+    final student = await _db.collection('students').doc(uid).get();
+    final studentName = student.data()?['std_fullname'] as String?;
+    return studentName?.trim();
   }
 
   /// Used by the profile edit screen — writes back to whichever
@@ -146,7 +171,10 @@ class AuthService {
   Future<void> updateProfile({
     required String role,
     required String fullName,
-    String? phone,
+    required String phone,
+    required String address,
+    required String gender,
+    required int age,
     String? universityOrAddress,
     String? photoUrl,
   }) async {
@@ -154,20 +182,42 @@ class AuthService {
     if (uid == null) throw StateError('ยังไม่ได้เข้าสู่ระบบ');
 
     final isEmployer = role == UserRole.employer;
-    final collection = isEmployer ? 'employers' : 'students';
-    await _db.collection(collection).doc(uid).set({
-      if (isEmployer) 'emp_fullname': fullName else 'std_fullname': fullName,
-      if (isEmployer) 'emp_phone': phone else 'std_phone': phone,
+    final roleCollection = isEmployer ? 'employers' : 'students';
+    final roleData = <String, dynamic>{
+      if (isEmployer) ...{
+        'emp_phone': FieldValue.delete(),
+        'emp_address': FieldValue.delete(),
+        'emp_gender': FieldValue.delete(),
+        'emp_age': FieldValue.delete(),
+      } else ...{
+        'std_phone': FieldValue.delete(),
+        'std_address': FieldValue.delete(),
+        'std_gender': FieldValue.delete(),
+        'std_age': FieldValue.delete(),
+      },
       if (isEmployer)
-        'emp_address': universityOrAddress
+        'emp_fullname': fullName.trim()
       else
-        'std_skill': universityOrAddress,
+        'std_fullname': fullName.trim(),
       if (photoUrl != null)
         if (isEmployer)
           'emp_photo_url': photoUrl
         else
           'std_photo_url': photoUrl,
-    }, SetOptions(merge: true));
+      if (!isEmployer && universityOrAddress != null)
+        'std_skill': universityOrAddress.trim(),
+    };
+
+    final batch = _db.batch();
+    batch.update(_db.collection('users').doc(uid), {
+      'u_phone': phone.trim(),
+      'u_address': address.trim(),
+      'u_gender': gender,
+      'u_age': age,
+    });
+    batch.set(_db.collection(roleCollection).doc(uid), roleData,
+        SetOptions(merge: true));
+    await batch.commit();
   }
 
   /// Reads back u_role for the given uid (defaults to current user).

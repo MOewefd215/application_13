@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../theme/app_theme.dart';
 import '../services/upload_service.dart';
+import '../services/auth_service.dart';
+import '../models/app_user_model.dart';
 
 class VerificationScreen extends StatefulWidget {
   /// Pass the signed-in user's uid, e.g.
@@ -14,7 +16,15 @@ class VerificationScreen extends StatefulWidget {
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
-  final _uploadService = UploadService(); // ใส่ cloudName/uploadPreset จริงตรงนี้
+  final _uploadService =
+      UploadService(); // ใส่ cloudName/uploadPreset จริงตรงนี้
+  Future<AppUserModel?>? _profileFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _profileFuture = AuthService().getCurrentAppUser();
+  }
 
   String? _studentCardUrl;
   String? _nationalIdUrl;
@@ -61,6 +71,14 @@ class _VerificationScreenState extends State<VerificationScreen> {
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
+          FutureBuilder<AppUserModel?>(
+            future: _profileFuture,
+            builder: (context, snapshot) {
+              final profile = snapshot.data;
+              if (profile == null) return const SizedBox.shrink();
+              return _profileSummary(profile);
+            },
+          ),
           _docTile(
             icon: Icons.badge_outlined,
             title: 'บัตรนักศึกษา',
@@ -114,7 +132,9 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     style: TextStyle(color: AppColors.textSecondary)),
                 const SizedBox(height: 4),
                 Text(
-                  allVerified ? 'ยืนยันตัวตนแล้วบางส่วน' : 'ยังไม่ได้ยืนยันตัวตน',
+                  allVerified
+                      ? 'ยืนยันตัวตนแล้วบางส่วน'
+                      : 'ยังไม่ได้ยืนยันตัวตน',
                   style: const TextStyle(
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary),
@@ -126,6 +146,54 @@ class _VerificationScreenState extends State<VerificationScreen> {
       ),
     );
   }
+
+  Widget _profileSummary(AppUserModel user) {
+    final gender = switch (user.gender) {
+      'male' => 'ชาย',
+      'female' => 'หญิง',
+      'other' => 'อื่น ๆ',
+      'prefer_not_to_say' => 'ไม่ประสงค์ระบุ',
+      _ => '-',
+    };
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(AppRadius.card),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('ข้อมูลบัญชีสำหรับยืนยัน',
+              style: TextStyle(fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          _profileRow('อีเมล', user.email),
+          _profileRow('เบอร์โทรศัพท์', user.phone),
+          _profileRow('ที่อยู่', user.address),
+          _profileRow('เพศ', gender),
+          _profileRow('อายุ', user.age?.toString()),
+        ],
+      ),
+    );
+  }
+
+  Widget _profileRow(String label, String? value) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 112,
+              child: Text(label,
+                  style: const TextStyle(color: AppColors.textSecondary)),
+            ),
+            Expanded(
+                child: Text(value?.trim().isNotEmpty == true ? value! : '-')),
+          ],
+        ),
+      );
 
   Widget _docTile({
     required IconData icon,
@@ -153,7 +221,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+                Text(title,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
                 Text(status,
                     style: TextStyle(
                         fontSize: 12,
@@ -171,8 +240,8 @@ class _VerificationScreenState extends State<VerificationScreen> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : OutlinedButton(
-                    style:
-                        OutlinedButton.styleFrom(minimumSize: const Size(0, 36)),
+                    style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(0, 36)),
                     onPressed: onUpload,
                     child: Text(
                       uploadedUrl != null ? 'อัปโหลดใหม่' : 'อัปโหลด',

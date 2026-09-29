@@ -4,6 +4,7 @@ import '../models/app_user_model.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../services/upload_service.dart';
+import '../utils/profile_validators.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final AppUserModel user;
@@ -18,8 +19,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       TextEditingController(text: widget.user.fullName);
   late final TextEditingController _phoneController =
       TextEditingController(text: widget.user.phone ?? '');
+  late final TextEditingController _addressController =
+      TextEditingController(text: widget.user.address ?? '');
+  late final TextEditingController _ageController =
+      TextEditingController(text: widget.user.age?.toString() ?? '');
   late final TextEditingController _extraController =
       TextEditingController(text: widget.user.universityOrAddress ?? '');
+  String? _selectedGender;
   bool _saving = false;
   bool _uploadingPhoto = false;
   String? _photoUrl;
@@ -31,6 +37,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void initState() {
     super.initState();
     _photoUrl = widget.user.photoUrl;
+    _selectedGender = widget.user.gender;
   }
 
   Future<void> _pickProfilePhoto() async {
@@ -53,14 +60,22 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void dispose() {
     _nameController.dispose();
     _phoneController.dispose();
+    _addressController.dispose();
+    _ageController.dispose();
     _extraController.dispose();
     super.dispose();
   }
 
   Future<void> _save() async {
-    if (_nameController.text.trim().isEmpty) {
+    final validationError =
+        ProfileValidators.validateName(_nameController.text) ??
+            ProfileValidators.validatePhone(_phoneController.text) ??
+            ProfileValidators.validateAddress(_addressController.text) ??
+            ProfileValidators.validateGender(_selectedGender) ??
+            ProfileValidators.validateAge(_ageController.text);
+    if (validationError != null) {
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('กรุณากรอกชื่อ-นามสกุล')));
+          .showSnackBar(SnackBar(content: Text(validationError)));
       return;
     }
     setState(() => _saving = true);
@@ -68,8 +83,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await AuthService().updateProfile(
         role: widget.user.role,
         fullName: _nameController.text.trim(),
-        phone: _phoneController.text.trim(),
-        universityOrAddress: _extraController.text.trim(),
+        phone: ProfileValidators.normalizePhone(_phoneController.text),
+        address: _addressController.text.trim(),
+        gender: _selectedGender!,
+        age: ProfileValidators.parseAge(_ageController.text)!,
+        universityOrAddress: _isEmployer ? null : _extraController.text.trim(),
         photoUrl: _photoUrl,
       );
       if (mounted) Navigator.pop(context, true);
@@ -150,6 +168,16 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             decoration: const InputDecoration(hintText: 'กรอกชื่อ-นามสกุล'),
           ),
           const SizedBox(height: 16),
+          _label('อีเมลบัญชี'),
+          const SizedBox(height: 8),
+          InputDecorator(
+            decoration: const InputDecoration(
+              prefixIcon: Icon(Icons.email_outlined),
+              helperText: 'อีเมลใช้สำหรับเข้าสู่ระบบและแก้ไขไม่ได้ที่หน้านี้',
+            ),
+            child: Text(widget.user.email),
+          ),
+          const SizedBox(height: 16),
           _label('เบอร์โทรศัพท์'),
           const SizedBox(height: 8),
           TextField(
@@ -158,17 +186,49 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             decoration: const InputDecoration(hintText: 'กรอกเบอร์โทรศัพท์'),
           ),
           const SizedBox(height: 16),
-          _label(_isEmployer ? 'ที่อยู่' : 'มหาวิทยาลัย / ทักษะความสามารถ'),
+          _label('ที่อยู่'),
           const SizedBox(height: 8),
           TextField(
-            controller: _extraController,
-            maxLines: _isEmployer ? 2 : 1,
-            decoration: InputDecoration(
-              hintText: _isEmployer
-                  ? 'ระบุที่อยู่สำหรับระบุตำแหน่งเริ่มต้น'
-                  : 'เช่น มหาวิทยาลัยเทคโนโลยีราชมงคลอีสาน',
-            ),
+            controller: _addressController,
+            maxLines: 2,
+            decoration: const InputDecoration(hintText: 'กรอกที่อยู่'),
           ),
+          const SizedBox(height: 16),
+          _label('เพศ'),
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: _selectedGender,
+            decoration: const InputDecoration(hintText: 'เลือกเพศ'),
+            items: const [
+              DropdownMenuItem(value: 'male', child: Text('ชาย')),
+              DropdownMenuItem(value: 'female', child: Text('หญิง')),
+              DropdownMenuItem(value: 'other', child: Text('อื่น ๆ')),
+              DropdownMenuItem(
+                value: 'prefer_not_to_say',
+                child: Text('ไม่ประสงค์ระบุ'),
+              ),
+            ],
+            onChanged: (value) => setState(() => _selectedGender = value),
+          ),
+          const SizedBox(height: 16),
+          _label('อายุ'),
+          const SizedBox(height: 8),
+          TextField(
+            controller: _ageController,
+            keyboardType: TextInputType.number,
+            decoration: const InputDecoration(hintText: 'อายุ (13–100 ปี)'),
+          ),
+          if (!_isEmployer) ...[
+            const SizedBox(height: 16),
+            _label('มหาวิทยาลัย / ทักษะความสามารถ'),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _extraController,
+              decoration: const InputDecoration(
+                hintText: 'เช่น มหาวิทยาลัย หรือทักษะที่ถนัด',
+              ),
+            ),
+          ],
           const SizedBox(height: 28),
           ElevatedButton(
             onPressed: (_saving || _uploadingPhoto) ? null : _save,

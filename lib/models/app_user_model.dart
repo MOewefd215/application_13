@@ -1,17 +1,18 @@
-/// Merges `users/{uid}` with the role-specific doc
-/// (`employers/{uid}` or `students/{uid}`) into one object the
-/// Profile screen can render — this is what was missing before:
-/// the profile UI never actually read back what was written at
-/// sign-up.
+import 'user_role.dart';
+
+/// Combines the private common profile in users/{uid} with the public
+/// role profile in employers/{uid} or students/{uid}.
 class AppUserModel {
   final String uid;
   final String email;
-  final String role; // UserRole.employer / UserRole.student
+  final String role;
   final String fullName;
   final String? photoUrl;
   final String? phone;
-  final String?
-      universityOrAddress; // std_skill/university for student, emp_address for employer
+  final String? address;
+  final String? gender;
+  final int? age;
+  final String? universityOrAddress;
   final double rating;
 
   const AppUserModel({
@@ -21,6 +22,9 @@ class AppUserModel {
     required this.fullName,
     this.photoUrl,
     this.phone,
+    this.address,
+    this.gender,
+    this.age,
     this.universityOrAddress,
     this.rating = 0,
   });
@@ -31,17 +35,40 @@ class AppUserModel {
     Map<String, dynamic>? roleMap,
   }) {
     final role = userMap['u_role'] as String? ?? '';
-    final isEmployer = role == 'employer';
+    final isEmployer = role == UserRole.employer;
+    final roleAddress = roleMap?[isEmployer ? 'emp_address' : 'std_address'];
+    final legacyPhone = roleMap?[isEmployer ? 'emp_phone' : 'std_phone'];
+    final rawAge =
+        userMap['u_age'] ?? roleMap?[isEmployer ? 'emp_age' : 'std_age'];
+    final age =
+        rawAge is num ? rawAge.toInt() : int.tryParse(rawAge?.toString() ?? '');
     return AppUserModel(
       uid: uid,
-      email: userMap['u_email'] ?? '',
+      email: userMap['u_email'] as String? ?? '',
       role: role,
-      fullName: roleMap?[isEmployer ? 'emp_fullname' : 'std_fullname'] ?? '',
+      fullName:
+          roleMap?[isEmployer ? 'emp_fullname' : 'std_fullname'] as String? ??
+              '',
       photoUrl:
           roleMap?[isEmployer ? 'emp_photo_url' : 'std_photo_url'] as String?,
-      phone: roleMap?[isEmployer ? 'emp_phone' : 'std_phone'],
-      universityOrAddress: roleMap?[isEmployer ? 'emp_address' : 'std_skill'],
+      phone: userMap['u_phone'] as String? ?? legacyPhone as String?,
+      address: userMap['u_address'] as String? ?? roleAddress as String?,
+      gender: userMap['u_gender'] as String? ??
+          roleMap?[isEmployer ? 'emp_gender' : 'std_gender'] as String?,
+      age: age,
+      universityOrAddress: isEmployer ? null : roleMap?['std_skill'] as String?,
       rating: (roleMap?['std_rating'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  /// Shared fields stored once in users/{uid}; do not duplicate private
+  /// contact details into public role documents.
+  Map<String, dynamic> toUserMap() => {
+        'u_email': email,
+        'u_phone': phone,
+        'u_address': address,
+        'u_gender': gender,
+        'u_age': age,
+        'u_role': role,
+      };
 }

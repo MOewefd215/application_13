@@ -209,18 +209,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 title: 'ข้อมูลส่วนตัว',
                 children: [
                   _infoRow('อีเมล', user.email.isEmpty ? '-' : user.email),
-                  _infoRow(
-                      'เบอร์โทร',
-                      (user.phone == null || user.phone!.isEmpty)
-                          ? '-'
-                          : user.phone!),
-                  _infoRow(
-                    isEmployer ? 'ที่อยู่' : 'มหาวิทยาลัย / ทักษะ',
-                    (user.universityOrAddress == null ||
-                            user.universityOrAddress!.isEmpty)
-                        ? '-'
-                        : user.universityOrAddress!,
-                  ),
+                  _infoRow('เบอร์โทร',
+                      user.phone?.isNotEmpty == true ? user.phone! : '-'),
+                  _infoRow('ที่อยู่',
+                      user.address?.isNotEmpty == true ? user.address! : '-'),
+                  _infoRow('เพศ', _genderLabel(user.gender)),
+                  _infoRow('อายุ', user.age == null ? '-' : '${user.age} ปี'),
+                  if (!isEmployer)
+                    _infoRow(
+                      'มหาวิทยาลัย / ทักษะ',
+                      user.universityOrAddress?.isNotEmpty == true
+                          ? user.universityOrAddress!
+                          : '-',
+                    ),
                 ],
               ),
               if (!isEmployer) ...[
@@ -334,6 +335,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ),
     );
   }
+
+  String _genderLabel(String? gender) => switch (gender) {
+        'male' => 'ชาย',
+        'female' => 'หญิง',
+        'other' => 'อื่น ๆ',
+        'prefer_not_to_say' => 'ไม่ประสงค์ระบุ',
+        _ => '-',
+      };
 
   Widget _infoRow(String label, String value) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 4),

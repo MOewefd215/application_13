@@ -43,12 +43,44 @@ service cloud.firestore {
           .data.participant_ids.hasAny([userId]);
     }
 
+    // Private common profile fields live in users/{uid}. Only the owner can read them.
     match /users/{userId} {
       allow create: if signedIn() && userId == request.auth.uid
-          && request.resource.data.u_role in ['employer', 'student'];
-      allow read: if signedIn();
-      // The role cannot be changed from the app after registration.
-      allow update, delete: if false;
+          && request.resource.data.u_role in ['employer', 'student']
+          && request.resource.data.u_email is string
+          && (!('u_phone' in request.resource.data)
+              || (request.resource.data.u_phone is string
+                  && request.resource.data.u_phone.size() >= 9
+                  && request.resource.data.u_phone.size() <= 16))
+          && (!('u_address' in request.resource.data)
+              || (request.resource.data.u_address is string
+                  && request.resource.data.u_address.size() >= 5
+                  && request.resource.data.u_address.size() <= 250))
+          && (!('u_gender' in request.resource.data)
+              || request.resource.data.u_gender in
+                  ['male', 'female', 'other', 'prefer_not_to_say'])
+          && (!('u_age' in request.resource.data)
+              || (request.resource.data.u_age is int
+                  && request.resource.data.u_age >= 13
+                  && request.resource.data.u_age <= 100));
+      allow read: if signedIn() && userId == request.auth.uid;
+      allow update: if signedIn() && userId == request.auth.uid
+          && request.resource.data.u_role == resource.data.u_role
+          && request.resource.data.u_email == resource.data.u_email
+          && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['u_phone', 'u_address', 'u_gender', 'u_age'])
+          && request.resource.data.u_phone is string
+          && request.resource.data.u_phone.size() >= 9
+          && request.resource.data.u_phone.size() <= 16
+          && request.resource.data.u_address is string
+          && request.resource.data.u_address.size() >= 5
+          && request.resource.data.u_address.size() <= 250
+          && request.resource.data.u_gender in
+              ['male', 'female', 'other', 'prefer_not_to_say']
+          && request.resource.data.u_age is int
+          && request.resource.data.u_age >= 13
+          && request.resource.data.u_age <= 100;
+      allow delete: if false;
     }
 
     // Public profile data. Each user may write only their own role profile.
