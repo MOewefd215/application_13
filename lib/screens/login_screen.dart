@@ -3,6 +3,7 @@ import '../theme/app_theme.dart';
 import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../utils/profile_validators.dart';
+import 'forgot_password_screen.dart';
 import 'home_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -255,7 +256,14 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _showForgotPasswordDialog,
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ForgotPasswordScreen(
+                          initialEmail: _emailController.text.trim(),
+                        ),
+                      ),
+                    ),
                     child: const Text('ลืมรหัสผ่าน?'),
                   ),
                 ),
@@ -311,47 +319,6 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _showForgotPasswordDialog() async {
-    final controller = TextEditingController(text: _emailController.text);
-    final email = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ลืมรหัสผ่าน'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text(
-                'กรอกอีเมลที่ใช้สมัคร ระบบจะส่งลิงก์ตั้งรหัสผ่านใหม่ให้'),
-            const SizedBox(height: 12),
-            TextField(
-              controller: controller,
-              keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(hintText: 'กรอกอีเมล'),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('ยกเลิก')),
-          TextButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('ส่งลิงก์'),
-          ),
-        ],
-      ),
-    );
-    if (email == null || email.isEmpty) return;
-    try {
-      await _authService.sendPasswordResetEmail(email);
-      if (mounted) {
-        _showError('ส่งลิงก์ตั้งรหัสผ่านใหม่ไปที่ $email แล้ว กรุณาเช็คอีเมล');
-      }
-    } catch (e) {
-      if (mounted) _showError(_authService.friendlyError(e));
-    }
   }
 
   Future<void> _handleGoogleSignIn() async {
