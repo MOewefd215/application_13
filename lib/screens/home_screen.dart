@@ -11,8 +11,6 @@ import '../models/user_role.dart';
 import '../models/job_model.dart';
 import 'job_detail_screen.dart';
 import 'notification_screen.dart';
-import 'job_history_screen.dart';
-import 'chat_screen.dart';
 import 'profile_screen.dart';
 import 'post_job_screen.dart';
 import '../navigation/app_tab_navigation.dart';
@@ -172,11 +170,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                  icon: const Icon(Icons.notifications_none_rounded),
-                  onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const NotificationScreen())),
+                    icon: const Icon(Icons.notifications_none_rounded),
+                    onPressed: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const NotificationScreen())),
                   ),
                 ),
               ],
@@ -265,9 +263,8 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: selected ? AppColors.navy : AppColors.card,
                             borderRadius: BorderRadius.circular(16),
                             border: Border.all(
-                              color: selected
-                                  ? AppColors.navy
-                                  : AppColors.border,
+                              color:
+                                  selected ? AppColors.navy : AppColors.border,
                             ),
                           ),
                           child: Icon(
@@ -280,9 +277,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           label,
                           style: TextStyle(
                             fontSize: 11,
-                            fontWeight: selected
-                                ? FontWeight.w700
-                                : FontWeight.normal,
+                            fontWeight:
+                                selected ? FontWeight.w700 : FontWeight.normal,
                             color: selected
                                 ? AppColors.navy
                                 : AppColors.textPrimary,
