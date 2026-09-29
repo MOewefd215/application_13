@@ -15,6 +15,7 @@ import 'screens/job_map_screen.dart';
 import 'screens/location_picker_screen.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
+import 'navigation/app_navigation.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,6 +33,7 @@ class StudentProApp extends StatelessWidget {
     return MaterialApp(
       title: 'มือโปรวัยเรียน',
       debugShowCheckedModeBanner: false,
+      navigatorKey: appNavigatorKey,
       theme: AppTheme.light,
       home: const LoginScreen(),
     );
@@ -61,8 +63,7 @@ class ScreenGallery extends StatelessWidget {
       'รีวิว (Review)': (_) => const ReviewScreen(),
       'แผนที่งาน / ระยะทาง (Job Map)': (_) => const JobMapScreen(
           jobTitle: 'ชื่อประกาศงาน', jobLat: 13.7563, jobLng: 100.5018),
-      'เลือกตำแหน่งงาน (Location Picker)': (_) =>
-          const LocationPickerScreen(),
+      'เลือกตำแหน่งงาน (Location Picker)': (_) => const LocationPickerScreen(),
     };
 
     return Scaffold(
@@ -83,8 +84,8 @@ class ScreenGallery extends StatelessWidget {
             child: ListTile(
               title: Text(title),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.push(
-                  context, MaterialPageRoute(builder: builder)),
+              onTap: () =>
+                  Navigator.push(context, MaterialPageRoute(builder: builder)),
             ),
           );
         },

@@ -177,6 +177,9 @@ class AuthService {
     required int age,
     String? universityOrAddress,
     String? photoUrl,
+    String? university,
+    String? faculty,
+    String? year,
   }) async {
     final uid = currentUser?.uid;
     if (uid == null) throw StateError('ยังไม่ได้เข้าสู่ระบบ');
@@ -206,6 +209,10 @@ class AuthService {
           'std_photo_url': photoUrl,
       if (!isEmployer && universityOrAddress != null)
         'std_skill': universityOrAddress.trim(),
+      if (!isEmployer && university != null)
+        'std_university': university.trim(),
+      if (!isEmployer && faculty != null) 'std_faculty': faculty.trim(),
+      if (!isEmployer && year != null) 'std_year': year.trim(),
     };
 
     final batch = _db.batch();

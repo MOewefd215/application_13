@@ -68,7 +68,7 @@ service cloud.firestore {
           && request.resource.data.u_role == resource.data.u_role
           && request.resource.data.u_email == resource.data.u_email
           && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['u_phone', 'u_address', 'u_gender', 'u_age'])
+              .hasOnly(['u_phone', 'u_address', 'u_gender', 'u_age', 'u_verification', 'u_phone_verified', 'u_email_verified'])
           && request.resource.data.u_phone is string
           && request.resource.data.u_phone.size() >= 9
           && request.resource.data.u_phone.size() <= 16
@@ -79,7 +79,18 @@ service cloud.firestore {
               ['male', 'female', 'other', 'prefer_not_to_say']
           && request.resource.data.u_age is int
           && request.resource.data.u_age >= 13
-          && request.resource.data.u_age <= 100;
+          && request.resource.data.u_age <= 100
+          && (!('u_email_verified' in request.resource.data)
+              || (request.resource.data.u_email_verified == true
+                  && request.auth.token.email_verified == true))
+          && (!('u_phone_verified' in request.resource.data)
+              || (request.resource.data.u_phone_verified == true
+                  && request.auth.token.phone_number == request.resource.data.u_phone))
+          && (!request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAny(['u_verification'])
+              || (request.resource.data.u_verification is map
+                  && request.resource.data.u_verification.get('student_card_status', '') == 'pending_review'
+                  && request.resource.data.u_verification.get('student_card_url', '') is string));
       allow delete: if false;
     }
 
@@ -125,7 +136,24 @@ service cloud.firestore {
       allow create: if isStudent()
           && request.resource.data.student_id == request.auth.uid
           && request.resource.data.status == 'pending'
-          && job(request.resource.data.job_id).data.job_status == 'Open';
+          && job(request.resource.data.job_id).data.job_status == 'Open'
+          && request.resource.data.applicant_profile is map
+          && request.resource.data.applicant_profile.name
+              == get(/databases/$(database)/documents/students/$(request.auth.uid)).data.get('std_fullname', '')
+          && request.resource.data.applicant_profile.email
+              == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('u_email', '')
+          && request.resource.data.applicant_profile.phone
+              == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('u_phone', '')
+          && request.resource.data.applicant_profile.university
+              == get(/databases/$(database)/documents/students/$(request.auth.uid)).data.get('std_university', '')
+          && request.resource.data.applicant_profile.faculty
+              == get(/databases/$(database)/documents/students/$(request.auth.uid)).data.get('std_faculty', '')
+          && request.resource.data.applicant_profile.year
+              == get(/databases/$(database)/documents/students/$(request.auth.uid)).data.get('std_year', '')
+          && request.resource.data.applicant_profile.skill
+              == get(/databases/$(database)/documents/students/$(request.auth.uid)).data.get('std_skill', '')
+          && request.resource.data.applicant_profile.rating
+              == get(/databases/$(database)/documents/students/$(request.auth.uid)).data.get('std_rating', 0);
       // A student sees their applications; a job owner sees applicants.
       allow read: if signedIn()
           && (resource.data.student_id == request.auth.uid
@@ -196,6 +224,7 @@ service cloud.firestore {
     match /reviews/{reviewId} {
       allow read: if signedIn();
       allow create: if isEmployer()
+          && reviewId == request.resource.data.job_id
           && request.resource.data.reviewer_id == request.auth.uid
           && job(request.resource.data.job_id).data.emp_id == request.auth.uid
           && job(request.resource.data.job_id).data.std_id

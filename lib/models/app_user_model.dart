@@ -14,6 +14,10 @@ class AppUserModel {
   final int? age;
   final String? universityOrAddress;
   final double rating;
+  final int ratingCount;
+  final String? university;
+  final String? faculty;
+  final String? year;
 
   const AppUserModel({
     required this.uid,
@@ -27,6 +31,10 @@ class AppUserModel {
     this.age,
     this.universityOrAddress,
     this.rating = 0,
+    this.ratingCount = 0,
+    this.university,
+    this.faculty,
+    this.year,
   });
 
   factory AppUserModel.fromMaps({
@@ -58,6 +66,10 @@ class AppUserModel {
       age: age,
       universityOrAddress: isEmployer ? null : roleMap?['std_skill'] as String?,
       rating: (roleMap?['std_rating'] as num?)?.toDouble() ?? 0,
+      ratingCount: (roleMap?['std_review_count'] as num?)?.toInt() ?? 0,
+      university: roleMap?['std_university'] as String?,
+      faculty: roleMap?['std_faculty'] as String?,
+      year: roleMap?['std_year']?.toString(),
     );
   }
 

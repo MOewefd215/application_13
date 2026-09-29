@@ -1,255 +1,292 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import '../theme/app_theme.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
 import '../services/upload_service.dart';
-import '../services/auth_service.dart';
-import '../models/app_user_model.dart';
+import '../theme/app_theme.dart';
 
 class VerificationScreen extends StatefulWidget {
-  /// Pass the signed-in user's uid, e.g.
-  /// `VerificationScreen(userId: FirebaseAuth.instance.currentUser!.uid)`.
-  final String userId;
-  const VerificationScreen({super.key, this.userId = 'demo_user'});
+  final String? userId;
+  const VerificationScreen({super.key, this.userId});
 
   @override
   State<VerificationScreen> createState() => _VerificationScreenState();
 }
 
 class _VerificationScreenState extends State<VerificationScreen> {
-  final _uploadService =
-      UploadService(); // ใส่ cloudName/uploadPreset จริงตรงนี้
-  Future<AppUserModel?>? _profileFuture;
+  final _auth = FirebaseAuth.instance;
+  final _db = FirebaseFirestore.instance;
+  final _upload = UploadService();
+  final _phoneController = TextEditingController();
+  Map<String, dynamic> _verification = {};
+  bool _loading = false;
+  bool _emailBusy = false;
+  bool _phoneBusy = false;
+  bool _phoneVerified = false;
+  bool _isStudent = false;
+  String? _error;
+  String? _verificationId;
+
+  String? get _uid => widget.userId ?? _auth.currentUser?.uid;
 
   @override
   void initState() {
     super.initState();
-    _profileFuture = AuthService().getCurrentAppUser();
+    _loadStatus();
   }
 
-  String? _studentCardUrl;
-  String? _nationalIdUrl;
-  bool _uploadingStudentCard = false;
-  bool _uploadingNationalId = false;
+  @override
+  void dispose() {
+    _phoneController.dispose();
+    super.dispose();
+  }
 
-  Future<void> _uploadDoc({
-    required String fieldName,
-    required void Function(bool) setLoading,
-    required void Function(String) onSuccess,
-  }) async {
-    setLoading(true);
+  Future<void> _loadStatus() async {
+    final uid = _uid;
+    if (uid == null) return;
+    final authUser = _auth.currentUser;
+    await authUser?.reload();
+    if (authUser?.emailVerified == true && authUser?.uid == uid) {
+      await authUser!.getIdToken(true);
+      await _db
+          .collection('users')
+          .doc(uid)
+          .set({'u_email_verified': true}, SetOptions(merge: true));
+    }
+    final snapshot = await _db.collection('users').doc(uid).get();
+    if (!mounted) return;
+    setState(() {
+      _verification = Map<String, dynamic>.from(
+          snapshot.data()?['u_verification'] as Map? ?? {});
+      _phoneController.text = snapshot.data()?['u_phone'] as String? ?? '';
+      _phoneVerified = snapshot.data()?['u_phone_verified'] == true;
+      _isStudent = snapshot.data()?['u_role'] == 'student';
+    });
+  }
+
+  Future<void> _uploadStudentCard() async {
+    final uid = _uid;
+    if (uid == null || _auth.currentUser?.uid != uid) return;
+    if (!_isStudent) {
+      setState(
+          () => _error = 'Only student accounts can submit a student card');
+      return;
+    }
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
-      final url = await _uploadService.pickAndUploadImage();
-      if (url == null) return; // ผู้ใช้กดยกเลิก
-
-      // บันทึกลิงก์รูปลง Firestore ที่ตาราง STUDENT (3.3 ตารางที่ 3.3)
-      await FirebaseFirestore.instance
-          .collection('students')
-          .doc(widget.userId)
-          .set({fieldName: url}, SetOptions(merge: true));
-
-      onSuccess(url);
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('อัปโหลดสำเร็จ')));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('อัปโหลดไม่สำเร็จ: $e')));
-      }
+      final url = await _upload.pickAndUploadVerificationImage(
+        userId: uid,
+        documentType: 'student_card',
+      );
+      if (url == null) return;
+      await _db.collection('users').doc(uid).set({
+        'u_verification': {
+          'student_card_url': url,
+          'student_card_status': 'pending_review',
+          'student_card_submitted_at': FieldValue.serverTimestamp(),
+        },
+      }, SetOptions(merge: true));
+      await _loadStatus();
+    } catch (error) {
+      if (mounted) setState(() => _error = 'อัปโหลดไม่สำเร็จ: $error');
     } finally {
-      setLoading(false);
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _sendEmailVerification() async {
+    final user = _auth.currentUser;
+    if (user == null) return;
+    setState(() {
+      _emailBusy = true;
+      _error = null;
+    });
+    try {
+      await user.sendEmailVerification();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ส่งลิงก์ยืนยันไปที่อีเมลแล้ว')),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = 'ส่งอีเมลไม่สำเร็จ: $error');
+    } finally {
+      if (mounted) setState(() => _emailBusy = false);
+    }
+  }
+
+  Future<void> _verifyPhone() async {
+    final user = _auth.currentUser;
+    final uid = _uid;
+    final rawPhone = _phoneController.text.trim();
+    final phone =
+        rawPhone.startsWith('0') ? '+66${rawPhone.substring(1)}' : rawPhone;
+    if (user == null || uid == null || phone.isEmpty) {
+      setState(
+          () => _error = 'กรอกเบอร์โทรศัพท์พร้อมรหัสประเทศ เช่น +66812345678');
+      return;
+    }
+    setState(() {
+      _phoneBusy = true;
+      _error = null;
+    });
+    final result = Completer<String>();
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phone,
+        verificationCompleted: (credential) async {
+          try {
+            await user.updatePhoneNumber(credential);
+            if (!result.isCompleted) result.complete('verified');
+          } catch (error) {
+            if (!result.isCompleted) result.completeError(error);
+          }
+        },
+        verificationFailed: (error) {
+          if (!result.isCompleted) result.completeError(error);
+        },
+        codeSent: (verificationId, _) {
+          _verificationId = verificationId;
+          if (!result.isCompleted) result.complete('code_sent');
+        },
+        codeAutoRetrievalTimeout: (verificationId) {
+          _verificationId = verificationId;
+          if (!result.isCompleted) result.complete('code_sent');
+        },
+      );
+      final state = await result.future.timeout(const Duration(minutes: 2));
+      if (state == 'code_sent' && mounted) {
+        final codeController = TextEditingController();
+        final code = await showDialog<String>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('ใส่รหัส OTP'),
+            content: TextField(
+              controller: codeController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'รหัส 6 หลัก'),
+            ),
+            actions: [
+              TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('ยกเลิก')),
+              FilledButton(
+                  onPressed: () =>
+                      Navigator.pop(context, codeController.text.trim()),
+                  child: const Text('ยืนยัน')),
+            ],
+          ),
+        );
+        codeController.dispose();
+        if (code == null || _verificationId == null) return;
+        final credential = PhoneAuthProvider.credential(
+          verificationId: _verificationId!,
+          smsCode: code,
+        );
+        await user.updatePhoneNumber(credential);
+      }
+      await user.getIdToken(true);
+      await _db.collection('users').doc(uid).set({
+        'u_phone': user.phoneNumber ?? phone,
+        'u_phone_verified': true,
+      }, SetOptions(merge: true));
+      await _loadStatus();
+    } catch (error) {
+      if (mounted) setState(() => _error = 'ยืนยันเบอร์ไม่สำเร็จ: $error');
+    } finally {
+      if (mounted) setState(() => _phoneBusy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final allVerified = _studentCardUrl != null && _nationalIdUrl != null;
-
+    final user = _auth.currentUser;
+    if (user == null || _uid == null || user.uid != _uid) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('ยืนยันตัวตน')),
+        body: const Center(
+            child: Text('กรุณาเข้าสู่ระบบด้วยบัญชีเจ้าของโปรไฟล์')),
+      );
+    }
+    final emailVerified = user.emailVerified;
+    final cardStatus = _verification['student_card_status'] as String?;
     return Scaffold(
       appBar: AppBar(title: const Text('ยืนยันตัวตน')),
       body: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          FutureBuilder<AppUserModel?>(
-            future: _profileFuture,
-            builder: (context, snapshot) {
-              final profile = snapshot.data;
-              if (profile == null) return const SizedBox.shrink();
-              return _profileSummary(profile);
-            },
-          ),
-          _docTile(
-            icon: Icons.badge_outlined,
-            title: 'บัตรนักศึกษา',
-            uploadedUrl: _studentCardUrl,
-            loading: _uploadingStudentCard,
-            onUpload: () => _uploadDoc(
-              fieldName: 'std_card_url',
-              setLoading: (v) => setState(() => _uploadingStudentCard = v),
-              onSuccess: (url) => setState(() => _studentCardUrl = url),
+          _statusCard('อีเมล', emailVerified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน',
+              emailVerified),
+          if (!emailVerified) ...[
+            const SizedBox(height: 8),
+            FilledButton.icon(
+              onPressed: _emailBusy ? null : _sendEmailVerification,
+              icon: const Icon(Icons.mark_email_read_outlined),
+              label: Text(_emailBusy ? 'กำลังส่ง...' : 'ส่งลิงก์ยืนยันอีเมล'),
             ),
-          ),
-          _docTile(
-            icon: Icons.credit_card_outlined,
-            title: 'บัตรประชาชน',
-            uploadedUrl: _nationalIdUrl,
-            loading: _uploadingNationalId,
-            onUpload: () => _uploadDoc(
-              fieldName: 'national_id_url',
-              setLoading: (v) => setState(() => _uploadingNationalId = v),
-              onSuccess: (url) => setState(() => _nationalIdUrl = url),
-            ),
-          ),
-          _docTile(
-            icon: Icons.email_outlined,
-            title: 'ยืนยันอีเมล',
-            uploadedUrl: null,
-            loading: false,
-            onUpload: () {},
-            statusOverride: 'ยังไม่ได้ยืนยัน',
-          ),
-          _docTile(
-            icon: Icons.phone_iphone_outlined,
-            title: 'ยืนยันเบอร์โทรศัพท์',
-            uploadedUrl: null,
-            loading: false,
-            onUpload: () {},
-            statusOverride: 'ยังไม่ได้ยืนยัน',
-          ),
-          const SizedBox(height: 20),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.circular(AppRadius.card),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Column(
-              children: [
-                const Text('สถานะการยืนยัน',
-                    style: TextStyle(color: AppColors.textSecondary)),
-                const SizedBox(height: 4),
-                Text(
-                  allVerified
-                      ? 'ยืนยันตัวตนแล้วบางส่วน'
-                      : 'ยังไม่ได้ยืนยันตัวตน',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _profileSummary(AppUserModel user) {
-    final gender = switch (user.gender) {
-      'male' => 'ชาย',
-      'female' => 'หญิง',
-      'other' => 'อื่น ๆ',
-      'prefer_not_to_say' => 'ไม่ประสงค์ระบุ',
-      _ => '-',
-    };
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('ข้อมูลบัญชีสำหรับยืนยัน',
-              style: TextStyle(fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          _profileRow('อีเมล', user.email),
-          _profileRow('เบอร์โทรศัพท์', user.phone),
-          _profileRow('ที่อยู่', user.address),
-          _profileRow('เพศ', gender),
-          _profileRow('อายุ', user.age?.toString()),
-        ],
-      ),
-    );
-  }
-
-  Widget _profileRow(String label, String? value) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            SizedBox(
-              width: 112,
-              child: Text(label,
-                  style: const TextStyle(color: AppColors.textSecondary)),
-            ),
-            Expanded(
-                child: Text(value?.trim().isNotEmpty == true ? value! : '-')),
+            TextButton(
+                onPressed: _loadStatus,
+                child: const Text('ฉันกดยืนยันแล้ว · ตรวจสอบอีกครั้ง')),
           ],
+          const SizedBox(height: 16),
+          _statusCard('เบอร์โทรศัพท์',
+              _phoneVerified ? 'ยืนยันแล้ว' : 'ยังไม่ยืนยัน', _phoneVerified),
+          TextField(
+            controller: _phoneController,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+                labelText: 'เบอร์พร้อมรหัสประเทศ', hintText: '+66812345678'),
+          ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _phoneBusy ? null : _verifyPhone,
+            icon: const Icon(Icons.sms_outlined),
+            label:
+                Text(_phoneBusy ? 'กำลังส่ง OTP...' : 'ส่ง OTP และยืนยันเบอร์'),
+          ),
+          const SizedBox(height: 16),
+          _statusCard(
+              'บัตรนักศึกษา',
+              switch (cardStatus) {
+                'pending_review' => 'รอตรวจสอบ',
+                'approved' => 'ผ่านการตรวจสอบ',
+                'rejected' => 'ไม่ผ่าน · อัปโหลดใหม่ได้',
+                _ => 'ยังไม่ได้ส่ง',
+              },
+              cardStatus == 'approved'),
+          const Text('ภาพบัตรจะถูกอัปโหลดไปยัง Cloudinary และส่งให้ตรวจสอบ'),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _loading ? null : _uploadStudentCard,
+            icon: _loading
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.badge_outlined),
+            label: Text(_loading ? 'กำลังอัปโหลด...' : 'เลือกรูปบัตรนักศึกษา'),
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Text(_error!, style: const TextStyle(color: AppColors.danger)),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _statusCard(String title, String status, bool verified) => Card(
+        color: AppColors.card,
+        child: ListTile(
+          leading: Icon(verified ? Icons.verified : Icons.pending_outlined,
+              color: verified ? AppColors.success : AppColors.textSecondary),
+          title: Text(title),
+          subtitle: Text(status),
         ),
       );
-
-  Widget _docTile({
-    required IconData icon,
-    required String title,
-    required String? uploadedUrl,
-    required bool loading,
-    required VoidCallback onUpload,
-    String? statusOverride,
-  }) {
-    final status = statusOverride ??
-        (uploadedUrl != null ? 'อัปโหลดแล้ว' : 'ยังไม่ได้อัปโหลด');
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(AppRadius.card),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.textPrimary),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
-                Text(status,
-                    style: TextStyle(
-                        fontSize: 12,
-                        color: uploadedUrl != null
-                            ? AppColors.success
-                            : AppColors.textSecondary)),
-              ],
-            ),
-          ),
-          if (statusOverride == null)
-            loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : OutlinedButton(
-                    style: OutlinedButton.styleFrom(
-                        minimumSize: const Size(0, 36)),
-                    onPressed: onUpload,
-                    child: Text(
-                      uploadedUrl != null ? 'อัปโหลดใหม่' : 'อัปโหลด',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                  ),
-        ],
-      ),
-    );
-  }
 }

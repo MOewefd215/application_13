@@ -27,9 +27,6 @@ class UploadService {
   Uri get _uploadUrl =>
       Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/image/upload');
 
-  Uri get _audioUploadUrl =>
-      Uri.parse('https://api.cloudinary.com/v1_1/$cloudName/video/upload');
-
   /// Opens the gallery, lets the user pick one image, uploads it, and
   /// returns the resulting HTTPS URL. Returns null if the user
   /// cancelled the picker.
@@ -45,74 +42,86 @@ class UploadService {
     return uploadFile(File(picked.path));
   }
 
+  /// Uploads a student verification image to the configured Cloudinary
+  /// unsigned preset and returns its HTTPS URL.
+  Future<String?> pickAndUploadVerificationImage({
+    required String userId,
+    required String documentType,
+    ImageSource source = ImageSource.gallery,
+    int imageQuality = 80,
+  }) async {
+    final picked = await ImagePicker().pickImage(
+      source: source,
+      imageQuality: imageQuality,
+    );
+    if (picked == null) return null;
+
+    final request = http.MultipartRequest('POST', _uploadUrl)
+      ..fields['upload_preset'] = uploadPreset
+      ..fields['folder'] = 'studentpro/verification/$userId'
+      ..fields['context'] = 'document_type=$documentType|user_id=$userId'
+      ..files.add(await http.MultipartFile.fromPath('file', picked.path));
+    final response = await http.Response.fromStream(await request.send());
+    if (response.statusCode != 200) {
+      throw StateError('อัปโหลดบัตรนักศึกษาไม่สำเร็จ (${response.statusCode})');
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final url = data['secure_url'] as String?;
+    if (url == null) {
+      throw StateError('อัปโหลดสำเร็จแต่ไม่ได้รับ URL ของรูปกลับมา');
+    }
+    return url;
+  }
+
   /// Uploads an already-picked file and returns its public URL.
   /// Throws [StateError] with a Thai message on failure so the UI
   /// can show it directly in a SnackBar.
   Future<String> uploadFile(File file) async {
-    return _upload(
-      file: file,
-      endpoint: _uploadUrl,
-      mediaLabel: 'รูปภาพ',
-    );
-  }
-
-  Future<String> _upload({
-    required File file,
-    required Uri endpoint,
-    required String mediaLabel,
-  }) async {
-    if (cloudName.isEmpty ||
-        uploadPreset.isEmpty ||
-        cloudName == 'YOUR_CLOUD_NAME' ||
+    if (cloudName == 'YOUR_CLOUD_NAME' ||
         uploadPreset == 'YOUR_UPLOAD_PRESET') {
       throw StateError(
           'ยังไม่ได้ตั้งค่า Cloudinary — ใส่ cloudName/uploadPreset ใน UploadService ก่อน');
     }
-    if (!await file.exists()) {
-      throw StateError('ไม่พบไฟล์$mediaLabelที่จะอัปโหลด');
-    }
 
-    final request = http.MultipartRequest('POST', endpoint)
+    final request = http.MultipartRequest('POST', _uploadUrl)
       ..fields['upload_preset'] = uploadPreset
       ..files.add(await http.MultipartFile.fromPath('file', file.path));
 
-    final streamedResponse = await request.send().timeout(
-          const Duration(seconds: 90),
-          onTimeout: () => throw StateError(
-              'อัปโหลด$mediaLabelใช้เวลานานเกินไป ลองใหม่อีกครั้ง'),
-        );
+    final streamedResponse = await request.send();
     final response = await http.Response.fromStream(streamedResponse);
 
     if (response.statusCode != 200) {
-      String detail = '';
-      try {
-        detail = (jsonDecode(response.body) as Map<String, dynamic>)['error']
-                    ?['message']
-                ?.toString() ??
-            '';
-      } catch (_) {
-        detail = response.body;
-      }
-      throw StateError(
-        'อัปโหลด$mediaLabelไม่สำเร็จ (${response.statusCode})'
-        '${detail.isEmpty ? '' : ': $detail'}',
-      );
+      throw StateError('อัปโหลดรูปไม่สำเร็จ (${response.statusCode})');
     }
 
     final data = jsonDecode(response.body) as Map<String, dynamic>;
     final url = data['secure_url'] as String?;
     if (url == null) {
-      throw StateError('อัปโหลด$mediaLabelสำเร็จแต่ไม่ได้รับลิงก์กลับมา');
+      throw StateError('อัปโหลดสำเร็จแต่ไม่ได้รับลิงก์รูปกลับมา');
     }
     return url;
   }
 
   /// Uploads an audio recording to Cloudinary and returns its public URL.
   Future<String> uploadAudioFile(File file) async {
-    return _upload(
-      file: file,
-      endpoint: _audioUploadUrl,
-      mediaLabel: 'ข้อความเสียง',
+    final audioUrl = Uri.parse(
+      'https://api.cloudinary.com/v1_1/$cloudName/video/upload',
     );
+    final request = http.MultipartRequest('POST', audioUrl)
+      ..fields['upload_preset'] = uploadPreset
+      ..files.add(await http.MultipartFile.fromPath('file', file.path));
+    final streamedResponse = await request.send();
+    final response = await http.Response.fromStream(streamedResponse);
+    if (response.statusCode != 200) {
+      throw StateError(
+        'Audio upload failed (${response.statusCode}): ${response.body}',
+      );
+    }
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    final url = data['secure_url'] as String?;
+    if (url == null) {
+      throw StateError('Audio upload completed but no URL was returned.');
+    }
+    return url;
   }
 }

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/job_model.dart';
 import '../models/job_application_model.dart';
-import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../services/job_service.dart';
 import '../services/chat_service.dart';
@@ -39,18 +38,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   JobModel? _job;
   bool _loading = false;
   bool _acting = false;
-  String? _currentRole;
 
   @override
   void initState() {
     super.initState();
     if (widget.jobId != null) _loadJob();
-    _loadCurrentRole();
-  }
-
-  Future<void> _loadCurrentRole() async {
-    final role = await _authService.getUserRole();
-    if (mounted) setState(() => _currentRole = role);
   }
 
   Future<void> _loadJob() async {
@@ -72,9 +64,10 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       await _jobService.applyToJob(jobId: widget.jobId!, stdId: uid);
       if (mounted) {
         setState(() {}); // รีเฟรช FutureBuilder ของ hasApplied
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'สมัครรับงานสำเร็จ เช็คสถานะได้ที่ "งานของฉัน" → "คำขอที่ส่งไป"')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(
+                content: Text(
+                    'สมัครรับงานสำเร็จ เช็คสถานะได้ที่ "งานของฉัน" → "คำขอที่ส่งไป"')));
       }
     } catch (e) {
       if (mounted) {
@@ -195,11 +188,11 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      _circleIcon(
-                          Icons.arrow_back, () => Navigator.pop(context)),
+                      _circleIcon(Icons.arrow_back, () => Navigator.pop(context)),
                       Row(
                         children: [
-                          if (isEmployer && job.jobStatus == JobStatus.open)
+                          if (isEmployer &&
+                              job.jobStatus == JobStatus.open)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
                               child: _circleIcon(Icons.edit_outlined, () async {
@@ -293,8 +286,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                   onPressed: () async {
                                     final otherUid =
                                         isEmployer ? job.stdId! : job.empId;
-                                    final chatPartnerName = await _authService
-                                        .getDisplayName(otherUid);
                                     final roomId = await _chatService.openRoom(
                                       uidA: uid,
                                       uidB: otherUid,
@@ -308,11 +299,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                           builder: (_) => ConversationScreen(
                                             roomId: roomId,
                                             otherUserId: otherUid,
-                                            title:
-                                                (chatPartnerName?.isNotEmpty ??
-                                                        false)
-                                                    ? chatPartnerName!
-                                                    : job.jobTitle,
+                                            title: job.jobTitle,
                                           ),
                                         ),
                                       );
@@ -337,7 +324,6 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                               const TextStyle(color: AppColors.textSecondary),
                         ),
                         if (isEmployer &&
-                            _currentRole == UserRole.employer &&
                             job.jobStatus == JobStatus.open) ...[
                           const SizedBox(height: 20),
                           const Text('ผู้สมัครรับงาน',
@@ -353,7 +339,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                     color: AppColors.card,
                                     borderRadius:
                                         BorderRadius.circular(AppRadius.card),
-                                    border: Border.all(color: AppColors.border),
+                                    border:
+                                        Border.all(color: AppColors.border),
                                   ),
                                   child: const EmptyState(
                                     icon: Icons.people_outline,
@@ -383,11 +370,12 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
                                           children: [
                                             const CircleAvatar(
                                               radius: 18,
-                                              backgroundColor: AppColors.border,
+                                              backgroundColor:
+                                                  AppColors.border,
                                               child: Icon(Icons.person,
                                                   size: 18,
-                                                  color:
-                                                      AppColors.textSecondary),
+                                                  color: AppColors
+                                                      .textSecondary),
                                             ),
                                             const SizedBox(width: 10),
                                             Expanded(
@@ -426,7 +414,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
             if (job != null)
               Padding(
                 padding: const EdgeInsets.all(16),
-                child: _buildActionButton(job, isEmployer, uid, _currentRole),
+                child: _buildActionButton(job, isEmployer, uid),
               ),
           ],
         ),
@@ -434,12 +422,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     );
   }
 
-  Widget _buildActionButton(
-    JobModel job,
-    bool isEmployer,
-    String? uid,
-    String? currentRole,
-  ) {
+  Widget _buildActionButton(JobModel job, bool isEmployer, String? uid) {
     if (_acting) {
       return const ElevatedButton(
         onPressed: null,
@@ -452,17 +435,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
 
     // นักศึกษา: งานยังว่าง ยังไม่มีใครรับ → สมัครรับงาน (รอผู้จ้างเลือก)
-    if (currentRole == null) {
-      return const ElevatedButton(
-        onPressed: null,
-        child: Text('กำลังตรวจสอบสิทธิ์ผู้ใช้'),
-      );
-    }
-
-    if (currentRole == UserRole.student &&
-        !isEmployer &&
-        job.stdId == null &&
-        job.jobStatus == JobStatus.open) {
+    if (!isEmployer && job.stdId == null && job.jobStatus == JobStatus.open) {
       if (uid == null) {
         return const ElevatedButton(
             onPressed: null, child: Text('กรุณาเข้าสู่ระบบก่อน'));
@@ -483,9 +456,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
 
     // ผู้จ้างงาน: มีนักศึกษารับงานแล้ว กำลังดำเนินการ → ยืนยันเสร็จ / ยกเลิก
-    if (isEmployer &&
-        currentRole == UserRole.employer &&
-        job.jobStatus == JobStatus.process) {
+    if (isEmployer && job.jobStatus == JobStatus.process) {
       return Row(
         children: [
           Expanded(
@@ -502,11 +473,8 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     }
 
     // งานเสร็จแล้ว → ให้รีวิวอีกฝ่าย
-    if (job.jobStatus == JobStatus.done &&
-        currentRole == UserRole.employer &&
-        isEmployer &&
-        uid != null) {
-      final revieweeId = job.stdId;
+    if (job.jobStatus == JobStatus.done && uid != null) {
+      final revieweeId = isEmployer ? job.stdId : job.empId;
       if (revieweeId != null) {
         return ElevatedButton(
           onPressed: () => Navigator.push(
@@ -524,9 +492,7 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
       }
     }
 
-    if (isEmployer &&
-        currentRole == UserRole.employer &&
-        job.jobStatus == JobStatus.open) {
+    if (isEmployer && job.jobStatus == JobStatus.open) {
       return const ElevatedButton(
         onPressed: null,
         child: Text('เลือกผู้สมัครจากรายชื่อด้านบน'),

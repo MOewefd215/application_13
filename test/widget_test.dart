@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import 'package:application_13/main.dart';
+import 'package:studentpro_ui/main.dart';
 
 void main() {
   testWidgets('app shows the preview title', (WidgetTester tester) async {

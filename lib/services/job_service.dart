@@ -153,17 +153,34 @@ class JobService {
       throw StateError('งานนี้ไม่เปิดรับสมัครแล้ว');
     }
 
-    await _applications.add(JobApplicationModel(
-      id: '',
-      jobId: jobId,
-      studentId: stdId,
-    ).toMap());
-
+    final profileDocs = await Future.wait([
+      _db.collection('users').doc(stdId).get(),
+      _db.collection('students').doc(stdId).get(),
+    ]);
+    final privateProfile = profileDocs[0].data() ?? <String, dynamic>{};
+    final studentProfile = profileDocs[1].data() ?? <String, dynamic>{};
+    final applicantProfile = <String, dynamic>{
+      'name': studentProfile['std_fullname'] ?? '',
+      'email': privateProfile['u_email'] ?? '',
+      'phone': privateProfile['u_phone'] ?? '',
+      'university': studentProfile['std_university'] ?? '',
+      'faculty': studentProfile['std_faculty'] ?? '',
+      'year': studentProfile['std_year'] ?? '',
+      'skill': studentProfile['std_skill'] ?? '',
+      // Keep the snapshot aligned with Firestore Rules; the applicant's
+      // profile screen loads the live review average directly from reviews.
+      'rating': studentProfile['std_rating'] ?? 0,
+    };
+    await _applications.add({
+      ...JobApplicationModel(id: '', jobId: jobId, studentId: stdId).toMap(),
+      'applicant_profile': applicantProfile,
+    });
     await NotificationService().create(
       userId: job.empId,
       title: 'มีผู้สมัครงานใหม่',
       body: 'งาน "${job.jobTitle}" มีนักศึกษาสมัครรับงานเพิ่ม',
       jobId: jobId,
+      type: 'job',
     );
   }
 
@@ -258,6 +275,7 @@ class JobService {
       title: 'คุณได้รับเลือกให้ทำงานนี้',
       body: 'งาน "${job.jobTitle}" เลือกคุณเป็นผู้รับงานแล้ว',
       jobId: jobId,
+      type: 'job',
     );
   }
 
@@ -273,6 +291,7 @@ class JobService {
         title: 'งานเสร็จสิ้นแล้ว',
         body: 'งาน "${job.jobTitle}" ถูกยืนยันว่าเสร็จสิ้นแล้ว',
         jobId: jobId,
+        type: 'job',
       );
     }
   }
@@ -282,12 +301,15 @@ class JobService {
     final job = await getJob(jobId);
     if (job == null) throw StateError('ไม่พบงานนี้');
     await _jobs.doc(jobId).update({'job_status': JobStatus.cancel});
-    if (job.stdId != null) {
+    final actorId = _auth.currentUser?.uid;
+    final recipientId = actorId == job.empId ? job.stdId : job.empId;
+    if (recipientId != null && recipientId != actorId) {
       await NotificationService().create(
-        userId: job.stdId!,
+        userId: recipientId,
         title: 'งานถูกยกเลิก',
         body: 'งาน "${job.jobTitle}" ถูกยกเลิกแล้ว',
         jobId: jobId,
+        type: 'job',
       );
     }
   }

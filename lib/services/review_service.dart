@@ -1,11 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/review_model.dart';
+import 'notification_service.dart';
+
+class ReviewSummary {
+  final double average;
+  final int count;
+  const ReviewSummary(this.average, this.count);
+}
 
 /// Backs "หน้ารีวิวผู้ใช้งาน" (3.3.12) — was previously a UI-only star
 /// picker that didn't save anything. Now writes to Firestore and
-/// keeps `std_rating` (ตารางที่ 3.3) up to date so the badge shown on
-/// ProfileScreen/JobDetail reflects real reviews.
+/// calculates rating summaries from review documents on the client, without
+/// requiring a Cloud Function or a Blaze billing account.
 class ReviewService {
   final FirebaseFirestore _db;
   ReviewService({FirebaseFirestore? firestore})
@@ -42,26 +49,18 @@ class ReviewService {
       rating: rating,
       comment: comment,
     );
-    await _db.collection('reviews').add(review.toMap());
-
-    await _recalculateAverageRating(revieweeId);
-  }
-
-  Future<void> _recalculateAverageRating(String revieweeId) async {
-    final snap = await _db
-        .collection('reviews')
-        .where('reviewee_id', isEqualTo: revieweeId)
-        .get();
-    if (snap.docs.isEmpty) return;
-
-    final ratings =
-        snap.docs.map((d) => (d.data()['rating'] as num).toDouble());
-    final average = ratings.reduce((a, b) => a + b) / ratings.length;
-
-    // เขียนกลับที่ students/{uid} — เผื่อ revieweeId ไม่ใช่นักศึกษา
-    // (เช่นรีวิวผู้จ้างงาน) การ set แบบ merge จะไม่พังอะไร แค่ไม่มีผล
-    await _db.collection('students').doc(revieweeId).set(
-        {'std_rating': average}, SetOptions(merge: true)).catchError((_) {});
+    final reviewRef = _db.collection('reviews').doc(jobId);
+    if ((await reviewRef.get()).exists) {
+      throw StateError('งานนี้มีรีวิวแล้ว');
+    }
+    await reviewRef.set(review.toMap());
+    await NotificationService().create(
+      userId: revieweeId,
+      title: 'คุณได้รับรีวิวใหม่',
+      body: 'You received a new review.',
+      jobId: jobId,
+      type: 'review',
+    );
   }
 
   /// Reviews received by a user — for ProfileScreen / ReviewScreen list.
@@ -79,4 +78,20 @@ class ReviewService {
       return reviews.take(limit).toList();
     });
   }
+
+  Stream<ReviewSummary> summaryForUser(String revieweeId) => _db
+          .collection('reviews')
+          .where('reviewee_id', isEqualTo: revieweeId)
+          .snapshots()
+          .map((snapshot) {
+        final ratings = snapshot.docs
+            .map((doc) => (doc.data()['rating'] as num?)?.toInt())
+            .whereType<int>()
+            .where((rating) => rating >= 1 && rating <= 5)
+            .toList();
+        if (ratings.isEmpty) return const ReviewSummary(0, 0);
+        final total =
+            ratings.fold<int>(0, (ratingTotal, rating) => ratingTotal + rating);
+        return ReviewSummary(total / ratings.length, ratings.length);
+      });
 }

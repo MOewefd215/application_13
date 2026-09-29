@@ -30,6 +30,16 @@ class LocationService {
     );
   }
 
+  /// Continuously emits the device location while this screen is active.
+  Stream<Position> positionStream({int distanceFilterMeters = 10}) {
+    return Geolocator.getPositionStream(
+      locationSettings: LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: distanceFilterMeters,
+      ),
+    );
+  }
+
   /// Distance between two coordinates, in kilometers.
   double distanceKm({
     required double lat1,

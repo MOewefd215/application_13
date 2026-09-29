@@ -25,6 +25,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       TextEditingController(text: widget.user.age?.toString() ?? '');
   late final TextEditingController _extraController =
       TextEditingController(text: widget.user.universityOrAddress ?? '');
+  late final TextEditingController _universityController =
+      TextEditingController(text: widget.user.university ?? '');
+  late final TextEditingController _facultyController =
+      TextEditingController(text: widget.user.faculty ?? '');
+  late final TextEditingController _yearController =
+      TextEditingController(text: widget.user.year ?? '');
   String? _selectedGender;
   bool _saving = false;
   bool _uploadingPhoto = false;
@@ -63,6 +69,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _addressController.dispose();
     _ageController.dispose();
     _extraController.dispose();
+    _universityController.dispose();
+    _facultyController.dispose();
+    _yearController.dispose();
     super.dispose();
   }
 
@@ -88,6 +97,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         gender: _selectedGender!,
         age: ProfileValidators.parseAge(_ageController.text)!,
         universityOrAddress: _isEmployer ? null : _extraController.text.trim(),
+        university: _isEmployer ? null : _universityController.text.trim(),
+        faculty: _isEmployer ? null : _facultyController.text.trim(),
+        year: _isEmployer ? null : _yearController.text.trim(),
         photoUrl: _photoUrl,
       );
       if (mounted) Navigator.pop(context, true);
@@ -228,6 +240,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 hintText: 'เช่น มหาวิทยาลัย หรือทักษะที่ถนัด',
               ),
             ),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _universityController,
+                decoration: const InputDecoration(labelText: 'มหาวิทยาลัย')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _facultyController,
+                decoration: const InputDecoration(labelText: 'คณะ')),
+            const SizedBox(height: 12),
+            TextField(
+                controller: _yearController,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Year of study')),
           ],
           const SizedBox(height: 28),
           ElevatedButton(

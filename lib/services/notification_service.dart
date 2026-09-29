@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'push_notification_service.dart';
 
 class NotificationModel {
   final String id;
@@ -56,8 +57,8 @@ class NotificationService {
     String? jobId,
     String? roomId,
     String? type,
-  }) {
-    return _col.add({
+  }) async {
+    await _col.add({
       'user_id': userId,
       'title': title,
       'body': body,
@@ -67,6 +68,15 @@ class NotificationService {
       'read': false,
       'created_at': FieldValue.serverTimestamp(),
     });
+    if ((type == 'job' || type == 'review') && jobId != null) {
+      await PushNotificationService().sendEventPush(
+        type: type!,
+        jobId: jobId,
+        recipientId: userId,
+        title: title,
+        body: body,
+      );
+    }
   }
 
   Stream<List<NotificationModel>> forUser(String userId, {bool? unreadOnly}) {

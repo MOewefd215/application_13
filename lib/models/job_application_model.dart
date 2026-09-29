@@ -15,6 +15,7 @@ class JobApplicationModel {
   final String studentId;
   final String status;
   final DateTime? appliedAt;
+  final Map<String, dynamic>? applicantProfile;
 
   const JobApplicationModel({
     required this.id,
@@ -22,6 +23,7 @@ class JobApplicationModel {
     required this.studentId,
     this.status = ApplicationStatus.pending,
     this.appliedAt,
+    this.applicantProfile,
   });
 
   factory JobApplicationModel.fromMap(String id, Map<String, dynamic> map) {
@@ -31,6 +33,9 @@ class JobApplicationModel {
       studentId: map['student_id'] ?? '',
       status: map['status'] ?? ApplicationStatus.pending,
       appliedAt: (map['applied_at'] as Timestamp?)?.toDate(),
+      applicantProfile: map['applicant_profile'] == null
+          ? null
+          : Map<String, dynamic>.from(map['applicant_profile'] as Map),
     );
   }
 

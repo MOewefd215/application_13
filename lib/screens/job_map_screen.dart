@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import '../theme/app_theme.dart';
@@ -31,29 +33,66 @@ class _JobMapScreenState extends State<JobMapScreen> {
   final _locationService = LocationService();
   String? _distanceLabel;
   String? _errorText;
+  Position? _currentPosition;
+  StreamSubscription<Position>? _positionSubscription;
 
   @override
   void initState() {
     super.initState();
-    _loadDistance();
+    _startTracking();
   }
 
-  Future<void> _loadDistance() async {
-    if (widget.jobLat == null || widget.jobLng == null) return;
+  Future<void> _startTracking() async {
     try {
-      final position = await _locationService.getCurrentPosition();
-      final km = _locationService.distanceKm(
-        lat1: position.latitude,
-        lng1: position.longitude,
-        lat2: widget.jobLat!,
-        lng2: widget.jobLng!,
+      final initial = await _locationService.getCurrentPosition();
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = initial;
+        final lat = widget.jobLat;
+        final lng = widget.jobLng;
+        if (lat != null && lng != null) {
+          _distanceLabel = _locationService.formatDistance(
+            _locationService.distanceKm(
+              lat1: initial.latitude,
+              lng1: initial.longitude,
+              lat2: lat,
+              lng2: lng,
+            ),
+          );
+        }
+      });
+      _positionSubscription = _locationService.positionStream().listen(
+        (position) {
+          if (!mounted) return;
+          setState(() {
+            _currentPosition = position;
+            final lat = widget.jobLat;
+            final lng = widget.jobLng;
+            if (lat != null && lng != null) {
+              _distanceLabel = _locationService.formatDistance(
+                _locationService.distanceKm(
+                  lat1: position.latitude,
+                  lng1: position.longitude,
+                  lat2: lat,
+                  lng2: lng,
+                ),
+              );
+            }
+          });
+        },
+        onError: (Object error) {
+          if (mounted) setState(() => _errorText = error.toString());
+        },
       );
-      if (mounted) {
-        setState(() => _distanceLabel = _locationService.formatDistance(km));
-      }
-    } catch (e) {
-      if (mounted) setState(() => _errorText = e.toString());
+    } catch (error) {
+      if (mounted) setState(() => _errorText = error.toString());
     }
+  }
+
+  @override
+  void dispose() {
+    _positionSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -85,6 +124,15 @@ class _JobMapScreenState extends State<JobMapScreen> {
                           child: const Icon(Icons.location_on,
                               color: AppColors.navy, size: 44),
                         ),
+                        if (_currentPosition != null)
+                          Marker(
+                            point: LatLng(_currentPosition!.latitude,
+                                _currentPosition!.longitude),
+                            width: 38,
+                            height: 38,
+                            child: const Icon(Icons.my_location,
+                                color: Colors.blue, size: 28),
+                          ),
                       ],
                     ),
                     const RichAttributionWidget(

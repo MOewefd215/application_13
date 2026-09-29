@@ -93,11 +93,42 @@ async function firestoreDocument(projectId, accessToken, path) {
   return response.json();
 }
 
+async function firestoreApplicant(projectId, accessToken, jobId, studentId) {
+  const response = await fetch(
+    `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents:runQuery`,
+    {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'job_applications' }],
+          where: {
+            compositeFilter: {
+              op: 'AND',
+              filters: [
+                { fieldFilter: { field: { fieldPath: 'job_id' }, op: 'EQUAL', value: { stringValue: jobId } } },
+                { fieldFilter: { field: { fieldPath: 'student_id' }, op: 'EQUAL', value: { stringValue: studentId } } },
+              ],
+            },
+          },
+          limit: 1,
+        },
+      }),
+    },
+  );
+  if (!response.ok) throw new Error(`Firestore query failed: ${await response.text()}`);
+  const rows = await response.json();
+  return rows.find((row) => row.document)?.document ?? null;
+}
+
 const stringField = (doc, field) => doc?.fields?.[field]?.stringValue;
 const arrayStrings = (doc, field) =>
   (doc?.fields?.[field]?.arrayValue?.values ?? []).map((item) => item.stringValue);
 
-async function sendPush({ account, token, title, body, roomId }) {
+async function sendPush({ account, token, title, body, type, roomId, jobId }) {
   const accessToken = await googleAccessToken(account);
   const response = await fetch(
     `https://fcm.googleapis.com/v1/projects/${account.project_id}/messages:send`,
@@ -111,7 +142,11 @@ async function sendPush({ account, token, title, body, roomId }) {
         message: {
           token,
           notification: { title, body },
-          data: { type: 'chat', roomId },
+          data: {
+            type,
+            ...(roomId ? { roomId } : {}),
+            ...(jobId ? { jobId } : {}),
+          },
           android: { priority: 'high' },
         },
       }),
@@ -132,23 +167,57 @@ export default {
       const auth = request.headers.get('authorization') ?? '';
       if (!auth.startsWith('Bearer ')) return json({ error: 'Sign in required' }, 401);
       const senderId = await verifyFirebaseIdToken(auth.substring(7), account.project_id);
-      const { roomId, recipientId, title, body } = await request.json();
-      if (![roomId, recipientId, title, body].every((item) => typeof item === 'string' && item)) {
-        return json({ error: 'roomId, recipientId, title, and body are required' }, 400);
+      const { type = 'chat', roomId, jobId, recipientId, title, body } = await request.json();
+      if (!['chat', 'job', 'review'].includes(type) ||
+          ![recipientId, title, body].every((item) => typeof item === 'string' && item)) {
+        return json({ error: 'type, recipientId, title, and body are required' }, 400);
       }
 
       const accessToken = await googleAccessToken(account);
-      const room = await firestoreDocument(account.project_id, accessToken, `chat_rooms/${roomId}`);
-      const participants = arrayStrings(room, 'participant_ids');
-      if (!participants.includes(senderId) || !participants.includes(recipientId)) {
-        return json({ error: 'You are not allowed to notify this user' }, 403);
+      if (type === 'chat') {
+        if (typeof roomId !== 'string' || !roomId) return json({ error: 'roomId is required' }, 400);
+        const room = await firestoreDocument(account.project_id, accessToken, `chat_rooms/${roomId}`);
+        const participants = arrayStrings(room, 'participant_ids');
+        if (!participants.includes(senderId) || !participants.includes(recipientId)) {
+          return json({ error: 'You are not allowed to notify this user' }, 403);
+        }
+      } else {
+        if (typeof jobId !== 'string' || !jobId) return json({ error: 'jobId is required' }, 400);
+        const job = await firestoreDocument(account.project_id, accessToken, `jobs/${jobId}`);
+        const employerId = stringField(job, 'emp_id');
+        const studentId = stringField(job, 'std_id');
+        let authorized = Boolean(employerId && studentId && (
+          (senderId === employerId && recipientId === studentId) ||
+          (senderId === studentId && recipientId === employerId)
+        ));
+        // A new application is sent before the job has an assigned student.
+        if (type === 'job' && employerId && recipientId === employerId && senderId !== employerId) {
+          const applicant = await firestoreApplicant(account.project_id, accessToken, jobId, senderId);
+          const sender = await firestoreDocument(account.project_id, accessToken, `users/${senderId}`);
+          authorized = Boolean(applicant && stringField(sender, 'u_role') === 'student');
+        }
+        if (!authorized || senderId === recipientId) {
+          return json({ error: 'Sender and recipient must be the two users assigned to this job' }, 403);
+        }
+        if (type === 'review') {
+          const review = await firestoreDocument(account.project_id, accessToken, `reviews/${jobId}`);
+          if (stringField(review, 'reviewer_id') !== senderId ||
+              stringField(review, 'reviewee_id') !== recipientId ||
+              stringField(job, 'job_status') !== 'Done') {
+            return json({ error: 'Review does not authorize this notification' }, 403);
+          }
+        }
       }
 
       const device = await firestoreDocument(account.project_id, accessToken, `devices/${recipientId}`);
       const fcmToken = stringField(device, 'fcm_token');
       if (!fcmToken) return json({ error: 'Recipient has not enabled notifications' }, 409);
 
-      await sendPush({ account, token: fcmToken, title, body, roomId });
+      await sendPush({
+        account, token: fcmToken, title, body, type,
+        roomId: type === 'chat' ? roomId : undefined,
+        jobId: type === 'chat' ? undefined : jobId,
+      });
       return json({ ok: true });
     } catch (error) {
       console.error(error);

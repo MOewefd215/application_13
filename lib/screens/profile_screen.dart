@@ -198,8 +198,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     children: [
                       const Icon(Icons.star, size: 16, color: AppColors.star),
                       const SizedBox(width: 4),
-                      Text('${user.rating.toStringAsFixed(1)} (0 รีวิว)',
-                          style: const TextStyle(fontSize: 12)),
+                      StreamBuilder<ReviewSummary>(
+                        stream: ReviewService().summaryForUser(user.uid),
+                        builder: (context, snapshot) {
+                          final summary = snapshot.data;
+                          final average = summary?.average ?? user.rating;
+                          final count = summary?.count ?? user.ratingCount;
+                          return Text(
+                            '${average.toStringAsFixed(1)} ($count รีวิว)',
+                            style: const TextStyle(fontSize: 12),
+                          );
+                        },
+                      ),
                     ],
                   ),
                 ),
