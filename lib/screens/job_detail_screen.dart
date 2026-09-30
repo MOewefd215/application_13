@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import '../models/job_model.dart';
 import '../models/job_application_model.dart';
+import '../models/user_role.dart';
 import '../services/auth_service.dart';
 import '../services/job_service.dart';
 import '../services/chat_service.dart';
@@ -37,12 +38,15 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
   final _chatService = ChatService();
 
   JobModel? _job;
+  Future<String?>? _userRoleFuture;
   bool _loading = false;
   bool _acting = false;
 
   @override
   void initState() {
     super.initState();
+    final uid = _authService.currentUser?.uid;
+    if (uid != null) _userRoleFuture = _authService.getUserRole(uid);
     if (widget.jobId != null) _loadJob();
   }
 
@@ -458,24 +462,50 @@ class _JobDetailScreenState extends State<JobDetailScreen> {
     if (!isEmployer && job.stdId == null && job.jobStatus == JobStatus.open) {
       if (uid == null) {
         return const ElevatedButton(
-            onPressed: null, child: Text('กรุณาเข้าสู่ระบบก่อน'));
+          onPressed: null,
+          child: Text('กรุณาเข้าสู่ระบบก่อน'),
+        );
       }
-      return FutureBuilder<bool>(
-        future: _jobService.hasApplied(jobId: job.jobId, stdId: uid),
-        builder: (context, snapshot) {
-          if (snapshot.data == true) {
+      return FutureBuilder<String?>(
+        future: _userRoleFuture,
+        builder: (context, roleSnapshot) {
+          if (roleSnapshot.connectionState != ConnectionState.done) {
             return const ElevatedButton(
               onPressed: null,
-              child: Text('สมัครแล้ว รอผู้จ้างงานพิจารณา'),
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
             );
           }
-          return ElevatedButton(
-              onPressed: _applyToJob, child: const Text('สมัครรับงานนี้'));
+          if (roleSnapshot.data != UserRole.student) {
+            return const ElevatedButton(
+              onPressed: null,
+              child: Text('เฉพาะบัญชีนักศึกษาเท่านั้นที่สมัครงานได้'),
+            );
+          }
+          return FutureBuilder<bool>(
+            future: _jobService.hasApplied(jobId: job.jobId, stdId: uid),
+            builder: (context, applicationSnapshot) {
+              if (applicationSnapshot.data == true) {
+                return const ElevatedButton(
+                  onPressed: null,
+                  child: Text('สมัครแล้ว รอผู้จ้างงานพิจารณา'),
+                );
+              }
+              return ElevatedButton(
+                onPressed: _applyToJob,
+                child: const Text('สมัครรับงานนี้'),
+              );
+            },
+          );
         },
       );
     }
-
-    // ผู้จ้างงาน: มีนักศึกษารับงานแล้ว กำลังดำเนินการ → ยืนยันเสร็จ / ยกเลิก
     if (isEmployer && job.jobStatus == JobStatus.process) {
       return Row(
         children: [
